@@ -12,6 +12,7 @@ interface AppBarProps {
   document: SetupDocument
   onReplace: (document: SetupDocument) => void
   onNewSetup: () => void
+  onAddSwitch: () => void
   onThemeChange: (theme: Theme) => void
 }
 
@@ -19,7 +20,13 @@ interface AppBarProps {
  * The persistence half of ticket 06's app bar: Import, Export and New setup.
  * The builder and canvas tickets add their own controls alongside these.
  */
-export function AppBar({ document, onReplace, onNewSetup, onThemeChange }: AppBarProps) {
+export function AppBar({
+  document,
+  onReplace,
+  onNewSetup,
+  onAddSwitch,
+  onThemeChange,
+}: AppBarProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -56,6 +63,10 @@ export function AppBar({ document, onReplace, onNewSetup, onThemeChange }: AppBa
       <h1 className="mr-auto text-sm font-semibold tracking-tight">Switch Setup Maker</h1>
 
       <ThemeControl theme={document.ui.theme} onThemeChange={onThemeChange} />
+
+      <button type="button" className={secondaryButton} onClick={onAddSwitch}>
+        + Add switch
+      </button>
 
       <input
         ref={fileInput}

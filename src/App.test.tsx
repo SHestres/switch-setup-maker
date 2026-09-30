@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { serializeDocument } from '@/model/serialize'
@@ -252,6 +253,387 @@ function canvasContent(): HTMLElement {
   if (!content) throw new Error('canvas content is not rendered')
   return content
 }
+
+function inspector(): HTMLElement {
+  return screen.getByRole('complementary', { name: 'Switch inspector' })
+}
+
+function storedSwitches(): Array<Record<string, unknown>> {
+  const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  return stored.setup.switches
+}
+
+interface PresetCase {
+  chip: string
+  layout: {
+    numbering: string
+    rows: Array<{
+      numbering?: string
+      ports: Array<{ id: string; label: string; kind: string; speed: string }>
+    }>
+  }
+}
+
+function ports(first: number, labels: string[], kind: string, speed: string) {
+  return labels.map((label, index) => ({ id: `p${first + index}`, label, kind, speed }))
+}
+
+const PRESET_LAYOUTS: PresetCase[] = [
+  {
+    chip: '24×1G + 2×SFP',
+    layout: {
+      numbering: 'odd-top-even-bottom',
+      rows: [
+        {
+          ports: ports(
+            1,
+            ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
+            'rj45',
+            '1G',
+          ),
+        },
+        {
+          ports: ports(
+            13,
+            ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
+            'rj45',
+            '1G',
+          ),
+        },
+        { numbering: 'start-over', ports: ports(25, ['1', '2'], 'sfp', '1G') },
+      ],
+    },
+  },
+  {
+    chip: 'Unifi 48 Port',
+    layout: {
+      numbering: 'odd-top-even-bottom',
+      rows: [
+        {
+          ports: ports(
+            1,
+            [
+              '1',
+              '3',
+              '5',
+              '7',
+              '9',
+              '11',
+              '13',
+              '15',
+              '17',
+              '19',
+              '21',
+              '23',
+              '25',
+              '27',
+              '29',
+              '31',
+              '33',
+              '35',
+              '37',
+              '39',
+              '41',
+              '43',
+              '45',
+              '47',
+            ],
+            'rj45',
+            '1G',
+          ),
+        },
+        {
+          ports: ports(
+            25,
+            [
+              '2',
+              '4',
+              '6',
+              '8',
+              '10',
+              '12',
+              '14',
+              '16',
+              '18',
+              '20',
+              '22',
+              '24',
+              '26',
+              '28',
+              '30',
+              '32',
+              '34',
+              '36',
+              '38',
+              '40',
+              '42',
+              '44',
+              '46',
+              '48',
+            ],
+            'rj45',
+            '1G',
+          ),
+        },
+        { numbering: 'continue', ports: ports(49, ['49', '50', '51', '52'], 'sfp+', '10G') },
+      ],
+    },
+  },
+  {
+    chip: '24×1G + 4×SFP+',
+    layout: {
+      numbering: 'odd-top-even-bottom',
+      rows: [
+        {
+          ports: ports(
+            1,
+            ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
+            'rj45',
+            '1G',
+          ),
+        },
+        {
+          ports: ports(
+            13,
+            ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
+            'rj45',
+            '1G',
+          ),
+        },
+        { numbering: 'continue', ports: ports(25, ['25', '27'], 'sfp+', '10G') },
+        { numbering: 'continue', ports: ports(27, ['26', '28'], 'sfp+', '10G') },
+      ],
+    },
+  },
+  {
+    chip: '12×1G + 2×SFP',
+    layout: {
+      numbering: 'even-top-zero-based',
+      rows: [
+        { ports: ports(1, ['0', '2', '4', '6', '8', '10'], 'rj45', '1G') },
+        { ports: ports(7, ['1', '3', '5', '7', '9', '11'], 'rj45', '1G') },
+        { numbering: 'start-over', ports: ports(13, ['0', '1'], 'sfp', '1G') },
+      ],
+    },
+  },
+]
+
+describe('add switch', () => {
+  it('opens the layout-preset gallery from the app bar', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+
+    const panel = inspector()
+    expect(within(panel).getByRole('heading', { name: 'Add a switch' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '24×1G + 2×SFP' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Unifi 48 Port' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '24×1G + 4×SFP+' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '12×1G + 2×SFP' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Start blank' })).toBeDisabled()
+  })
+
+  it.each(PRESET_LAYOUTS)('creates the exact layout for $chip', ({ chip, layout }) => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: chip }))
+
+    expect(storedSwitches()).toHaveLength(1)
+    expect(storedSwitches()[0].layout).toEqual(layout)
+  })
+
+  it('lands each new switch at the visible centre with the diagonal cascade', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '12×1G + 2×SFP' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '24×1G + 2×SFP' }))
+
+    expect(storedSwitches()[0]).toMatchObject({ id: 'sw1', x: 160, y: 355.5 })
+    expect(storedSwitches()[1]).toMatchObject({ id: 'sw2', x: 184, y: 379.5 })
+  })
+
+  it('a preset chip selects the new switch and flips the panel to its editor', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '24×1G + 2×SFP' }))
+
+    const panel = inspector()
+    expect(within(panel).getByRole('heading', { name: 'Edit switch' })).toBeInTheDocument()
+    expect(within(panel).getByLabelText('Name')).toHaveValue('')
+    expect(within(panel).getByLabelText('Model')).toHaveValue('')
+  })
+
+  it('clicking a switch body selects it and opens its editor on that switch', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+
+    const core = screen.getByRole('group', { name: 'Core' })
+    fireEvent.click(core)
+
+    expect(core).toHaveClass('selected')
+    const panel = inspector()
+    expect(within(panel).getByRole('heading', { name: 'Edit switch' })).toBeInTheDocument()
+    expect(within(panel).getByLabelText('Name')).toHaveValue('Core')
+    expect(within(panel).getByLabelText('Model')).toHaveValue('NSW-24G-4X')
+  })
+
+  it('name and model edits update the faceplate live and survive a refresh', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    const app = render(<App />)
+
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Rack A' } })
+    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'USW-24' } })
+
+    const faceplate = screen.getByRole('group', { name: 'Rack A' })
+    expect(within(faceplate).getByText('USW-24')).toBeInTheDocument()
+
+    app.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('group', { name: 'Rack A' })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('group', { name: 'Rack A' })).getByText('USW-24'),
+    ).toBeInTheDocument()
+  })
+
+  it('places new switches at the visible centre after panning and zooming', async () => {
+    render(<App />)
+    const incoming = sampleDocument()
+    incoming.setup = { switches: [], connections: [] }
+    incoming.ui.viewport = { x: 100, y: 50, zoom: 2 }
+    importFile(jsonFile(incoming))
+    await waitFor(() =>
+      expect(canvasContent().style.transform).toBe('translate(100px, 50px) scale(2)'),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '12×1G + 2×SFP' }))
+
+    expect(storedSwitches()[0]).toMatchObject({ x: -190, y: 130.5 })
+  })
+
+  it('only the Unifi 48 Port entry prefills the model name', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '24×1G + 2×SFP' }))
+    expect(storedSwitches()[0]).toMatchObject({ model: '' })
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Unifi 48 Port' }))
+
+    expect(storedSwitches()[1]).toMatchObject({ model: 'Unifi 48 Port' })
+    expect(screen.getByRole('group', { name: 'Unifi 48 Port' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Model')).toHaveValue('Unifi 48 Port')
+  })
+
+  it('shows the full preset details while a chip is hovered', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    const chip = within(inspector()).getByRole('button', { name: 'Unifi 48 Port' })
+    expect(within(inspector()).queryByText(/49–52/)).not.toBeInTheDocument()
+
+    await user.hover(chip)
+
+    expect(within(inspector()).getByText(/2 rows of 24 RJ45 1G ports/)).toBeInTheDocument()
+    expect(within(inspector()).getByText(/49–52/)).toBeInTheDocument()
+
+    await user.unhover(chip)
+    expect(within(inspector()).queryByText(/49–52/)).not.toBeInTheDocument()
+  })
+})
+
+describe('closing the inspector', () => {
+  it('closes with the ✕', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('closes with Escape', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('an empty-canvas click closes the panel and deselects', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    const core = screen.getByRole('group', { name: 'Core' })
+    fireEvent.click(core)
+    expect(core).toHaveClass('selected')
+
+    fireEvent.click(screen.getByTestId('canvas-stage'))
+
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+    expect(core).not.toHaveClass('selected')
+  })
+})
+
+describe('port clicks', () => {
+  it('never open the inspector', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' }))
+
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('leave an open inspector and its selection alone', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+
+    expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
+  })
+})
+
+describe('inspector overlay', () => {
+  it('never re-fits the canvas when it opens or closes, and stays non-modal', () => {
+    const restored = sampleDocument()
+    restored.ui.viewport = { x: 40, y: -20, zoom: 1.5 }
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(restored))
+    render(<App />)
+    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+    // The canvas behind the overlay is still live: picking another switch just retargets it.
+    fireEvent.click(screen.getByRole('group', { name: 'Edge' }))
+    expect(screen.getByLabelText('Name')).toHaveValue('Edge')
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+  })
+})
 
 function canvasRoot(): HTMLElement {
   const root = document.querySelector<HTMLElement>('.canvas-root')
