@@ -178,7 +178,11 @@ describe('canvas', () => {
     importFile(jsonFile(incoming))
 
     expect(await screen.findByText('Core')).toBeInTheDocument()
-    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+    // The imported viewport lands one render pass after the switches do, via
+    // Canvas's setTransform effect; wait for it instead of racing it.
+    await waitFor(() =>
+      expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)'),
+    )
   })
 
   it('drags a switch by the pointer and keeps the new position across a refresh', () => {
