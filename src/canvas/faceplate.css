@@ -78,6 +78,27 @@
   stroke-linecap: round;
 }
 
+/* The ephemeral wire following the pointer: dashed, in the theme accent. */
+.canvas-root .wire-layer path.pending {
+  stroke: var(--accent);
+  stroke-dasharray: 7 5;
+}
+
+/* A refusal hint anchored above the offending Port. */
+.canvas-root .wire-hint {
+  position: absolute;
+  z-index: 5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 6px));
+}
+
 .canvas-root .switch {
   position: absolute;
   width: var(--rack-width);
@@ -382,6 +403,13 @@
 
 .canvas-root .port:hover .jack {
   border-color: var(--accent);
+}
+
+/* The Port a pending wire starts from. */
+.canvas-root .port.pending .jack {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .canvas-root .port:focus-visible .jack {

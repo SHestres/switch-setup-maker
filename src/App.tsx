@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Canvas } from '@/canvas/Canvas'
 import { DEFAULT_CANVAS_SIZE, placeNewSwitch } from '@/canvas/placement'
 import type { Size } from '@/canvas/placement'
-import { connectionsTouchingSwitch, removeSwitch } from '@/model/connections'
-import { moveSwitch, nextSwitchId, resetSetup, setTheme, setViewport } from '@/model/document'
+import { WIRE_HINT_MS } from '@/canvas/wiring'
+import type { WireHintState } from '@/canvas/wiring'
+import { connect, connectionsTouchingSwitch, removeSwitch } from '@/model/connections'
+import {
+  findPort,
+  moveSwitch,
+  nextSwitchId,
+  resetSetup,
+  setTheme,
+  setViewport,
+} from '@/model/document'
 import { applyLayoutEdit, countSeveredConnections, planLayoutEdit } from '@/model/layoutEdit'
 import type { LayoutEdit } from '@/model/layoutEdit'
 import { switchFromPreset } from '@/model/presets'
 import type { LayoutPreset } from '@/model/presets'
-import type { Switch } from '@/model/types'
+import type { PortRef, Switch } from '@/model/types'
 import { useDocument } from '@/model/useDocument'
 import { AppBar } from '@/ui/AppBar'
 import { Dialog } from '@/ui/Dialog'
@@ -59,6 +68,28 @@ export default function App() {
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null)
   const [draft, setDraft] = useState<DraftSwitch | null>(null)
   const [canvasSize, setCanvasSize] = useState<Size>(DEFAULT_CANVAS_SIZE)
+  /** The Port a pending wire starts from; ephemeral UI state, never persisted. */
+  const [pendingPort, setPendingPort] = useState<PortRef | null>(null)
+  /** A connection refusal near its offending Port; fades on its own. */
+  const [wireHint, setWireHint] = useState<WireHintState | null>(null)
+
+  useEffect(() => {
+    if (!wireHint) return
+    const timer = setTimeout(() => setWireHint(null), WIRE_HINT_MS)
+    return () => clearTimeout(timer)
+  }, [wireHint])
+
+  // Escape abandons a pending wire (and its hint). An open confirm owns the key.
+  useEffect(() => {
+    if ((!pendingPort && !wireHint) || confirm) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setPendingPort(null)
+      setWireHint(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [pendingPort, wireHint, confirm])
 
   const selectedSwitchId = inspector?.mode === 'editor' ? inspector.switchId : null
   const selectedSwitch = selectedSwitchId
@@ -134,6 +165,29 @@ export default function App() {
     }))
   }
 
+  const handlePortClick = (ref: PortRef) => {
+    // Only Ports that exist in the document are wireable; draft-switch ports are not.
+    if (!findPort(document.setup, ref)) return
+
+    const from = pendingPort && findPort(document.setup, pendingPort) ? pendingPort : null
+    if (!from) {
+      setWireHint(null)
+      setPendingPort(ref)
+      return
+    }
+
+    const result = connect(document.setup, from, ref)
+    if (!result.ok) {
+      // The refusal keeps the pending wire: only the target end was the problem.
+      setWireHint({ port: result.problem.port ?? ref, message: result.problem.message })
+      return
+    }
+
+    setDocument((current) => ({ ...current, setup: result.setup }))
+    setPendingPort(null)
+    setWireHint(null)
+  }
+
   const requestLayoutEdit = (edit: LayoutEdit) => {
     const switch_ = selectedSwitch
     if (!switch_) return
@@ -191,11 +245,15 @@ export default function App() {
           setDocument(next)
           setDraft(null)
           setInspector(null)
+          setPendingPort(null)
+          setWireHint(null)
         }}
         onNewSetup={() => {
           setDocument((current) => resetSetup(current))
           setDraft(null)
           setInspector(null)
+          setPendingPort(null)
+          setWireHint(null)
         }}
         onAddSwitch={openGallery}
         onThemeChange={(theme) => setDocument((current) => setTheme(current, theme))}
@@ -211,7 +269,14 @@ export default function App() {
           onViewportChange={(viewport) => setDocument((current) => setViewport(current, viewport))}
           onCanvasSizeChange={setCanvasSize}
           onSelectSwitch={selectSwitch}
-          onClearSelection={closeInspector}
+          onClearSelection={() => {
+            closeInspector()
+            setPendingPort(null)
+            setWireHint(null)
+          }}
+          onPortClick={handlePortClick}
+          pendingPort={pendingPort}
+          hint={wireHint}
         />
         {inspector?.mode === 'gallery' && (
           <Inspector title="Add a switch" onClose={() => closeInspector()}>

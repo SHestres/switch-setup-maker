@@ -3,11 +3,15 @@ import type { MouseEvent } from 'react'
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
 
+import { sameRef } from '@/model/connections'
 import type { PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
 
 import { Faceplate } from './Faceplate'
+import { WireHint } from './WireHint'
 import { WireLayer } from './WireLayer'
+import type { Point } from './geometry'
 import type { Size } from './placement'
+import type { WireHintState } from './wiring'
 import './faceplate.css'
 
 export const CANVAS_CONTENT_ID = 'canvas-content'
@@ -32,6 +36,10 @@ export interface CanvasProps {
   onSelectSwitch?: (switchId: string) => void
   onClearSelection?: () => void
   onPortClick?: (ref: PortRef) => void
+  /** The Port a pending wire starts from, when one is being drawn. */
+  pendingPort?: PortRef | null
+  /** A connection refusal to show near the offending Port. */
+  hint?: WireHintState | null
   /** The rendered container size, so placement can land on the visible centre. */
   onCanvasSizeChange?: (size: Size) => void
 }
@@ -68,6 +76,8 @@ export function Canvas({
   onSelectSwitch,
   onClearSelection,
   onPortClick,
+  pendingPort = null,
+  hint = null,
   onCanvasSizeChange,
 }: CanvasProps) {
   const viewport = document.ui.viewport
@@ -81,9 +91,27 @@ export function Canvas({
   const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null)
   const scaleRef = useRef(viewport.zoom)
   const lastViewportRef = useRef(viewport)
+  const transformStateRef = useRef({ x: viewport.x, y: viewport.y, zoom: viewport.zoom })
   const movedRef = useRef(false)
   const suppressClickRef = useRef(false)
   const [drag, setDrag] = useState<DragPosition | null>(null)
+  // The pointer in canvas units, tagged with the Port it belongs to, so a stale
+  // position from a previous wire is never reused.
+  const [pointer, setPointer] = useState<{ ref: PortRef; point: Point } | null>(null)
+
+  // Client coordinates to canvas units, so the pending wire follows the pointer.
+  const pointFromEvent = (event: { clientX: number; clientY: number }): Point => {
+    const rect = rootRef.current?.getBoundingClientRect()
+    const transform = transformStateRef.current
+    return {
+      x: (event.clientX - (rect?.left ?? 0) - transform.x) / transform.zoom,
+      y: (event.clientY - (rect?.top ?? 0) - transform.y) / transform.zoom,
+    }
+  }
+
+  const handleCanvasMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    if (pendingPort) setPointer({ ref: pendingPort, point: pointFromEvent(event) })
+  }
 
   // Report the rendered size so new switches can be centred on what is visible.
   useEffect(() => {
@@ -110,6 +138,7 @@ export function Canvas({
     if (!controls || sameViewport(viewport, lastViewportRef.current)) return
     lastViewportRef.current = viewport
     scaleRef.current = viewport.zoom
+    transformStateRef.current = { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
     void controls.setTransform(viewport.x, viewport.y, viewport.zoom, 0)
   }, [viewport])
 
@@ -122,8 +151,19 @@ export function Canvas({
 
   const beginDrag = (event: MouseEvent<HTMLDivElement>, switch_: Switch) => {
     if (event.button !== 0) return
-    // Ports own their pointer gestures; a drag only starts on the body.
-    if ((event.target as Element).closest('.port')) return
+    // Ports own their pointer gestures; a drag only starts on the body, and a
+    // port mousedown seeds the pending wire at the click point.
+    const portElement = (event.target as Element).closest('.port')
+    if (portElement) {
+      const portId = portElement.getAttribute('data-port')
+      if (portId) {
+        setPointer({
+          ref: { switch: switch_.id, port: portId },
+          point: pointFromEvent(event),
+        })
+      }
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
     movedRef.current = false
@@ -185,6 +225,7 @@ export function Canvas({
       className="canvas-root"
       data-theme={document.ui.theme}
       onClick={handleBackgroundClick}
+      onMouseMove={handleCanvasMouseMove}
     >
       <TransformWrapper
         ref={transformRef}
@@ -198,6 +239,11 @@ export function Canvas({
         panning={{ velocityDisabled: true, excluded: ['button', 'switch'] }}
         onTransform={(_ref, state) => {
           scaleRef.current = state.scale
+          transformStateRef.current = {
+            x: state.positionX,
+            y: state.positionY,
+            zoom: state.scale,
+          }
         }}
         onPanningStop={persistViewport}
         onWheelStop={persistViewport}
@@ -216,13 +262,25 @@ export function Canvas({
                 y={drag?.id === switch_.id ? drag.y : switch_.y}
                 selected={switch_.id === selectedSwitchId}
                 connectedPorts={connectedPorts}
+                pendingPortId={pendingPort?.switch === switch_.id ? pendingPort.port : null}
                 onMouseDown={(event) => beginDrag(event, switch_)}
                 onClick={handleSwitchClick(switch_)}
                 onPortClick={onPortClick}
               />
             ))}
             {draft && <Faceplate switch_={draft} x={draft.x} y={draft.y} ghost />}
-            <WireLayer setup={document.setup} />
+            <WireLayer
+              setup={document.setup}
+              pending={
+                pendingPort
+                  ? {
+                      from: pendingPort,
+                      to: pointer && sameRef(pointer.ref, pendingPort) ? pointer.point : undefined,
+                    }
+                  : null
+              }
+            />
+            {hint && <WireHint setup={document.setup} hint={hint} />}
           </div>
         </TransformComponent>
       </TransformWrapper>

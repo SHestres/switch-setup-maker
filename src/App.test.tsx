@@ -733,18 +733,6 @@ describe('wires', () => {
     )
     expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
   })
-
-  it('keeps port clicks inert: no pending wire and no document change', () => {
-    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
-    render(<App />)
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-
-    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
-    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Edge' }))
-
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
-    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
-  })
 })
 
 interface StoredLayout {
@@ -1043,6 +1031,175 @@ describe('switch layout editor', () => {
 
     expect(screen.queryByRole('group', { name: 'Edge' })).not.toBeInTheDocument()
     expect(storedLayout()).toBeDefined()
+  })
+})
+function wireLayerElement(): HTMLElement {
+  return screen.getByTestId('wire-layer')
+}
+
+function pendingPath(): SVGPathElement | null {
+  return wireLayerElement().querySelector<SVGPathElement>('[data-pending]')
+}
+
+describe('wiring', () => {
+  beforeEach(() => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+  })
+
+  it('starts a pending wire on the first port click and lands it on the second', () => {
+    const app = render(<App />)
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+
+    expect(pendingPath()).toHaveAttribute('data-pending', 'sw1:p2')
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+    expect(wireLayerElement().querySelectorAll('path[data-connection]')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Edge' }))
+
+    expect(pendingPath()).not.toBeInTheDocument()
+    expect(
+      wireLayerElement().querySelector('[data-connection="sw1:p2-sw2:p1"]'),
+    ).toBeInTheDocument()
+    expect(storedConnections()).toContainEqual({
+      a: { switch: 'sw1', port: 'p2' },
+      b: { switch: 'sw2', port: 'p1' },
+    })
+
+    app.unmount()
+    render(<App />)
+
+    expect(
+      wireLayerElement().querySelector('[data-connection="sw1:p2-sw2:p1"]'),
+    ).toBeInTheDocument()
+  })
+
+  it('allows wiring two ports on the same switch', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'SFP+ port 1 (10G) on Core' }))
+
+    expect(
+      wireLayerElement().querySelector('[data-connection="sw1:p2-sw1:p49"]'),
+    ).toBeInTheDocument()
+    expect(storedConnections()).toContainEqual({
+      a: { switch: 'sw1', port: 'p2' },
+      b: { switch: 'sw1', port: 'p49' },
+    })
+  })
+
+  it('refuses a busy port and shows the connection rules’ hint near it', () => {
+    render(<App />)
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' }))
+
+    const hint = screen.getByRole('status')
+    expect(hint).toHaveTextContent('Port 2 is already connected.')
+    expect(hint).toHaveAttribute('data-hint-port', 'sw2:p2')
+
+    expect(
+      wireLayerElement().querySelector('[data-connection="sw1:p2-sw2:p2"]'),
+    ).not.toBeInTheDocument()
+    expect(storedConnections()).toHaveLength(1)
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+    // The wire stays for another target: only the refused end was the problem.
+    expect(pendingPath()).toHaveAttribute('data-pending', 'sw1:p2')
+  })
+
+  it('cancels a pending wire with Escape and leaves no effect', () => {
+    render(<App />)
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' }))
+    expect(pendingPath()).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(pendingPath()).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+    expect(wireLayerElement().querySelectorAll('path[data-connection]')).toHaveLength(1)
+
+    // The next port click starts a fresh wire rather than landing the cancelled one.
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Edge' }))
+    expect(pendingPath()).toHaveAttribute('data-pending', 'sw2:p1')
+  })
+
+  it('cancels a pending wire on an empty-canvas click and leaves no effect', () => {
+    render(<App />)
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByTestId('canvas-stage'))
+
+    expect(pendingPath()).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+    expect(wireLayerElement().querySelectorAll('path[data-connection]')).toHaveLength(1)
+  })
+
+  it('fades a refusal hint on its own', () => {
+    vi.useFakeTimers()
+    try {
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+      fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' }))
+      expect(screen.getByRole('status')).toBeInTheDocument()
+
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      expect(pendingPath()).toHaveAttribute('data-pending', 'sw1:p2')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refuses wiring a port to itself with the self-link copy', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('A port cannot connect to itself.')
+    expect(screen.getByRole('status')).toHaveAttribute('data-hint-port', 'sw1:p2')
+    expect(storedConnections()).toHaveLength(1)
+  })
+
+  it('refuses a duplicate pair with the duplicate copy', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('Those ports are already connected.')
+    expect(screen.getByRole('status')).toHaveAttribute('data-hint-port', 'sw2:p2')
+    expect(storedConnections()).toHaveLength(1)
+  })
+
+  it('draws the pending wire from the source port to the pointer', () => {
+    render(<App />)
+    const port = screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })
+
+    fireEvent.mouseDown(port, { clientX: 40, clientY: 60, button: 0 })
+    fireEvent.click(port)
+
+    const fromClick = pendingPath()?.getAttribute('d')
+    expect(fromClick).toBeTruthy()
+
+    fireEvent.mouseMove(canvasRoot(), { clientX: 260, clientY: 180 })
+
+    const afterMove = pendingPath()?.getAttribute('d')
+    expect(afterMove).not.toBe(fromClick)
+    expect(afterMove).toContain('260 180')
   })
 })
 
