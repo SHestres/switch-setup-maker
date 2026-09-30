@@ -1,7 +1,7 @@
 # 20: Draft switch builder
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 19
 
 ## What to build
