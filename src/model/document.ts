@@ -81,3 +81,8 @@ export function moveSwitch(
 export function setViewport(document: SetupDocument, viewport: Viewport): SetupDocument {
   return { ...document, ui: { ...document.ui, viewport } }
 }
+
+/** Switch the persisted theme without touching the rest of the ui state. */
+export function setTheme(document: SetupDocument, theme: Theme): SetupDocument {
+  return { ...document, ui: { ...document.ui, theme } }
+}
