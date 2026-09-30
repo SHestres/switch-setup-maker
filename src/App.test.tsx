@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { serializeDocument } from '@/model/serialize'
@@ -34,7 +34,7 @@ describe('restore on load', () => {
 
     expect(screen.getByText('Core')).toBeInTheDocument()
     expect(screen.getByText('Edge')).toBeInTheDocument()
-    expect(screen.getByText(/2 switches/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toBeInTheDocument()
   })
 
   it('shows the empty state on a first run', () => {
@@ -130,3 +130,125 @@ describe('new setup', () => {
     expect(screen.getByText('Core')).toBeInTheDocument()
   })
 })
+
+describe('canvas', () => {
+  it('renders restored faceplates with rows, labels, kinds and speeds', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+
+    render(<App />)
+
+    const core = screen.getByRole('group', { name: 'Core' })
+    expect(within(core).getByText('NSW-24G-4X')).toBeInTheDocument()
+    expect(
+      within(core).getByRole('button', { name: 'RJ45 port 1 (1G) on Core' }),
+    ).toBeInTheDocument()
+    expect(
+      within(core).getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }),
+    ).toBeInTheDocument()
+    expect(
+      within(core).getByRole('button', { name: 'SFP+ port 1 (10G) on Core' }),
+    ).toBeInTheDocument()
+    expect(within(core).getByText('3')).toBeInTheDocument()
+
+    const edge = screen.getByRole('group', { name: 'Edge' })
+    expect(
+      within(edge).getByRole('button', { name: 'RJ45 port 1 (1G) on Edge' }),
+    ).toBeInTheDocument()
+    expect(
+      within(edge).getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' }),
+    ).toBeInTheDocument()
+    expect(within(edge).getByText('2')).toBeInTheDocument()
+  })
+
+  it('shows the first-run card with the final copy until the first switch exists', () => {
+    render(<App />)
+
+    expect(screen.getByText('No switches yet')).toBeInTheDocument()
+    expect(
+      screen.getByText('Add a switch, then click any two ports to wire them.'),
+    ).toBeInTheDocument()
+  })
+
+  it('applies the viewport from an imported setup', async () => {
+    render(<App />)
+    const incoming = sampleDocument()
+    incoming.ui.viewport = { x: 40, y: -20, zoom: 1.5 }
+
+    importFile(jsonFile(incoming))
+
+    expect(await screen.findByText('Core')).toBeInTheDocument()
+    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+  })
+
+  it('drags a switch by the pointer and keeps the new position across a refresh', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    const app = render(<App />)
+    const core = screen.getByRole('group', { name: 'Core' })
+
+    fireEvent.mouseDown(core, { clientX: 200, clientY: 200, button: 0 })
+    fireEvent.mouseMove(document, { clientX: 260, clientY: 230 })
+    fireEvent.mouseUp(document, { clientX: 260, clientY: 230 })
+
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.setup.switches[0]).toMatchObject({ x: 180, y: 390 })
+
+    app.unmount()
+    render(<App />)
+    expect(screen.getByRole('group', { name: 'Core' })).toHaveStyle({
+      left: '180px',
+      top: '390px',
+    })
+  })
+
+  it('does not move a switch on a click', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    const core = screen.getByRole('group', { name: 'Core' })
+
+    fireEvent.mouseDown(core, { clientX: 200, clientY: 200, button: 0 })
+    fireEvent.mouseUp(document, { clientX: 200, clientY: 200 })
+    fireEvent.click(core)
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.setup.switches[0]).toMatchObject({ x: 120, y: 360 })
+  })
+
+  it('pans the canvas and keeps the viewport across a refresh', () => {
+    const app = render(<App />)
+
+    fireEvent.mouseDown(canvasContent(), { clientX: 100, clientY: 100, button: 0 })
+    fireEvent.mouseMove(document, { clientX: 160, clientY: 130, buttons: 1 })
+    fireEvent.mouseUp(document, { clientX: 160, clientY: 130 })
+
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.ui.viewport).toEqual({ x: 60, y: 30, zoom: 1 })
+
+    app.unmount()
+    render(<App />)
+    expect(canvasContent().style.transform).toBe('translate(60px, 30px) scale(1)')
+  })
+
+  it('persists zoom after a wheel gesture', () => {
+    vi.useFakeTimers()
+    try {
+      render(<App />)
+
+      fireEvent.wheel(canvasContent(), { deltaY: -120, clientX: 100, clientY: 100 })
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+
+      const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+      expect(stored.ui.viewport.zoom).toBeGreaterThan(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+function canvasContent(): HTMLElement {
+  const content = document.querySelector<HTMLElement>('#canvas-content')
+  if (!content) throw new Error('canvas content is not rendered')
+  return content
+}

@@ -59,3 +59,25 @@ export function resetSetup(document: SetupDocument): SetupDocument {
     ui: { ...document.ui, viewport: { ...DEFAULT_VIEWPORT } },
   }
 }
+
+/** Move one switch to a new top-left corner; other switches and the ui stay put. */
+export function moveSwitch(
+  document: SetupDocument,
+  switchId: string,
+  position: { x: number; y: number },
+): SetupDocument {
+  return {
+    ...document,
+    setup: {
+      ...document.setup,
+      switches: document.setup.switches.map((switch_) =>
+        switch_.id === switchId ? { ...switch_, ...position } : switch_,
+      ),
+    },
+  }
+}
+
+/** Replace the persisted viewport without touching the rest of the ui state. */
+export function setViewport(document: SetupDocument, viewport: Viewport): SetupDocument {
+  return { ...document, ui: { ...document.ui, viewport } }
+}
