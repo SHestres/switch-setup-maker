@@ -1,7 +1,7 @@
 # 22: Wire ports by clicking
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 21
 
 ## What to build
