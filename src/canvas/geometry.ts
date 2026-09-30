@@ -184,13 +184,14 @@ export function wireCurve(a: Point, b: Point): string {
 
 /** The SVG path for one Connection, or undefined when a referenced Port is gone. */
 export function connectionCurve(setup: Setup, connection: Connection): string | undefined {
-  const a = anchorFor(setup, connection.a)
-  const b = anchorFor(setup, connection.b)
+  const a = pointForPort(setup, connection.a)
+  const b = pointForPort(setup, connection.b)
   if (!a || !b) return undefined
   return wireCurve(a, b)
 }
 
-function anchorFor(setup: Setup, ref: PortRef): Point | undefined {
+/** Where a Port ref's anchor sits in canvas coordinates, when it exists. */
+export function pointForPort(setup: Setup, ref: PortRef): Point | undefined {
   const switch_ = findSwitch(setup, ref.switch)
   return switch_ ? portAnchor(switch_, ref.port) : undefined
 }
