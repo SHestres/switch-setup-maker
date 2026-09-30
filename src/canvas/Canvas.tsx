@@ -28,6 +28,8 @@ interface DragPosition {
 
 export interface CanvasProps {
   document: SetupDocument
+  /** A switch being built by hand: previewed as a ghost, never draggable, clickable or wireable. */
+  draft?: Switch | null
   selectedSwitchId?: string | null
   onMoveSwitch?: (switchId: string, position: { x: number; y: number }) => void
   onViewportChange?: (viewport: Viewport) => void
@@ -67,6 +69,7 @@ function connectedPortKeys(connections: SetupDocument['setup']['connections']): 
  */
 export function Canvas({
   document,
+  draft = null,
   selectedSwitchId = null,
   onMoveSwitch,
   onViewportChange,
@@ -265,6 +268,7 @@ export function Canvas({
                 onPortClick={onPortClick}
               />
             ))}
+            {draft && <Faceplate switch_={draft} x={draft.x} y={draft.y} ghost />}
             <WireLayer
               setup={document.setup}
               pending={
@@ -280,7 +284,7 @@ export function Canvas({
           </div>
         </TransformComponent>
       </TransformWrapper>
-      {switches.length === 0 && (
+      {switches.length === 0 && !draft && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center p-8">
           <div className="max-w-md rounded-xl border border-dashed border-border bg-card p-8 text-center">
             <h2 className="text-lg font-semibold">No switches yet</h2>

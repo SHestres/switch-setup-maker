@@ -430,7 +430,7 @@ describe('add switch', () => {
     expect(within(panel).getByRole('button', { name: 'Unifi 48 Port' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '24×1G + 4×SFP+' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '12×1G + 2×SFP' })).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: 'Start blank' })).toBeDisabled()
+    expect(within(panel).getByRole('button', { name: 'Start blank' })).toBeEnabled()
   })
 
   it.each(PRESET_LAYOUTS)('creates the exact layout for $chip', ({ chip, layout }) => {
@@ -1033,7 +1033,6 @@ describe('switch layout editor', () => {
     expect(storedLayout()).toBeDefined()
   })
 })
-
 function wireLayerElement(): HTMLElement {
   return screen.getByTestId('wire-layer')
 }
@@ -1201,5 +1200,246 @@ describe('wiring', () => {
     const afterMove = pendingPath()?.getAttribute('d')
     expect(afterMove).not.toBe(fromClick)
     expect(afterMove).toContain('260 180')
+  })
+})
+
+describe('draft switch', () => {
+  function startBlank(): void {
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Start blank' }))
+  }
+
+  function ghost(): HTMLElement {
+    return screen.getByRole('group', { name: 'Draft switch' })
+  }
+
+  it('previews a ghost draft on the canvas that never reaches the document or storage', () => {
+    render(<App />)
+
+    startBlank()
+
+    const preview = ghost()
+    expect(preview).toBeInTheDocument()
+    // Untouched means zero ports and no controls to wire, drag or select.
+    expect(within(preview).queryAllByRole('button')).toHaveLength(0)
+    expect(screen.queryByText('No switches yet')).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('live-previews the rows being built while keeping the draft out of the document and storage', () => {
+    render(<App />)
+    startBlank()
+    const add = within(inspector()).getByRole('button', { name: 'Add switch' })
+
+    expect(add).toBeDisabled()
+    expect(storedSwitches()).toHaveLength(0)
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+
+    const preview = ghost()
+    expect(within(preview).getByText('12')).toBeInTheDocument()
+    expect(within(preview).queryByText('13')).not.toBeInTheDocument()
+    // The previewed ports stay decorative: nothing to click, wire or focus.
+    expect(within(preview).queryAllByRole('button')).toHaveLength(0)
+    expect(add).toBeEnabled()
+    expect(storedSwitches()).toHaveLength(0)
+
+    const count = within(inspector()).getByLabelText('Row 1 port count')
+    fireEvent.change(count, { target: { value: '4' } })
+    fireEvent.blur(count)
+
+    expect(within(preview).getByText('4')).toBeInTheDocument()
+    expect(within(preview).queryByText('5')).not.toBeInTheDocument()
+
+    fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
+    fireEvent.change(within(inspector()).getByLabelText('Model'), {
+      target: { value: 'USW-24' },
+    })
+
+    expect(within(preview).getByText('Rack A')).toBeInTheDocument()
+    expect(within(preview).getByText('USW-24')).toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+    expect(window.localStorage.getItem(STORAGE_KEY) ?? '').not.toContain('Rack A')
+    expect(window.localStorage.getItem(STORAGE_KEY) ?? '').not.toContain('USW-24')
+  })
+
+  it('commits the previewed draft through the placement rule and selects the new switch', () => {
+    render(<App />)
+    startBlank()
+
+    fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
+    fireEvent.change(within(inspector()).getByLabelText('Model'), { target: { value: 'USW-24' } })
+    fireEvent.change(within(inspector()).getByLabelText('Port numbering'), {
+      target: { value: 'sequential' },
+    })
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    const count = within(inspector()).getByLabelText('Row 1 port count')
+    fireEvent.change(count, { target: { value: '4' } })
+    fireEvent.blur(count)
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add switch' }))
+
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(within(inspector()).getByRole('heading', { name: 'Edit switch' })).toBeInTheDocument()
+
+    expect(storedSwitches()).toHaveLength(1)
+    expect(storedSwitches()[0]).toMatchObject({
+      id: 'sw1',
+      name: 'Rack A',
+      model: 'USW-24',
+      x: 160,
+      y: 355.5,
+    })
+    expect(storedLayout()).toEqual({
+      numbering: 'sequential',
+      rows: [
+        {
+          ports: [
+            { id: 'p1', label: '1', kind: 'rj45', speed: '1G' },
+            { id: 'p2', label: '2', kind: 'rj45', speed: '1G' },
+            { id: 'p3', label: '3', kind: 'rj45', speed: '1G' },
+            { id: 'p4', label: '4', kind: 'rj45', speed: '1G' },
+          ],
+        },
+      ],
+    })
+    expect(screen.getByRole('group', { name: 'Rack A' })).toHaveClass('selected')
+  })
+
+  it('discards an untouched draft silently when the panel is closed', () => {
+    render(<App />)
+    startBlank()
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+    expect(screen.getByText('No switches yet')).toBeInTheDocument()
+  })
+
+  it('discards an untouched draft silently on Escape', () => {
+    render(<App />)
+    startBlank()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('discards an untouched draft silently on an empty-canvas click', () => {
+    render(<App />)
+    startBlank()
+
+    fireEvent.click(screen.getByTestId('canvas-stage'))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('asks before discarding an edited draft and keeps it on cancel', async () => {
+    render(<App />)
+    startBlank()
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Discard this switch?')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(within(inspector()).getByRole('heading', { name: 'New switch' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Draft switch' })).toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+    const again = await screen.findByRole('alertdialog')
+    fireEvent.click(within(again).getByRole('button', { name: 'Discard' }))
+
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('asks before replacing an edited draft with the gallery', async () => {
+    render(<App />)
+    startBlank()
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Discard this switch?')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
+
+    expect(within(inspector()).getByRole('heading', { name: 'Add a switch' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('counts a typed name as an edit even before any row exists', async () => {
+    render(<App />)
+    startBlank()
+
+    fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Discard this switch?')
+  })
+
+  it('cancels the discard confirm with Escape and keeps the draft', async () => {
+    render(<App />)
+    startBlank()
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
+    const dialog = await screen.findByRole('alertdialog')
+
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Draft switch' })).toBeInTheDocument()
+    expect(within(inspector()).getByRole('heading', { name: 'New switch' })).toBeInTheDocument()
+    expect(storedSwitches()).toHaveLength(0)
+  })
+
+  it('discards an untouched draft silently when another switch is selected instead', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    startBlank()
+
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
+    expect(storedSwitches()).toHaveLength(2)
+  })
+
+  it('confirms before an edited draft gives way to the switch that was clicked', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    startBlank()
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
+
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Discard this switch?')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
+
+    expect(screen.queryByRole('group', { name: 'Draft switch' })).not.toBeInTheDocument()
+    expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
+    expect(storedSwitches()).toHaveLength(2)
+    expect(storedSwitches().some((switch_) => switch_.name === 'Rack A')).toBe(false)
   })
 })
