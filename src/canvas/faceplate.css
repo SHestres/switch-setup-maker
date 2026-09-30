@@ -18,6 +18,7 @@
   --jack-border: 1px solid #cbd5e1;
   --jack-radius: 3px;
   --jack-shadow: none;
+  --jack-connected-bg: #aab6c4;
   --latch-bg: #94a3b8;
   --led-off: #d7dde5;
   --led-on: #22c55e;
@@ -38,6 +39,7 @@
   --vents-opacity: 0.35;
   --sfp-bg: #334155;
   --sfp-border: #243244;
+  --sfp-connected-bg: #5a6b80;
   --sfp-image: none;
 
   position: relative;
@@ -54,6 +56,26 @@
   position: relative;
   width: 1px;
   height: 1px;
+}
+
+/*
+ * One SVG for every Connection, drawn inside the canvas transform. Its 1x1
+ * viewport grows visually via `overflow: visible`. The cable-above/behind
+ * ordering is ticket 23's; until then the layer paints over the faceplates.
+ */
+.canvas-root .wire-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-root .wire-layer path {
+  fill: none;
+  stroke: var(--wire);
+  stroke-width: calc(var(--wire-width) * 1px);
+  stroke-linecap: round;
 }
 
 .canvas-root .switch {
@@ -367,6 +389,21 @@
   outline-offset: 1px;
 }
 
+/* Wired ports: a distinct grey jack fill in addition to the lit LED. */
+.canvas-root .port.connected .jack {
+  background-color: var(--jack-connected-bg);
+}
+
+.canvas-root .port.kind-sfp.connected .jack,
+.canvas-root .port.kind-sfpp.connected .jack {
+  background-color: var(--sfp-connected-bg);
+}
+
+.canvas-root .port.connected .led {
+  background: var(--led-on);
+  box-shadow: var(--led-glow);
+}
+
 /*
  * Dark "photoreal": metal-gradient bodies and sunken jacks. Per the spec the
  * canvas keeps the light theme's dot grid, dark-tinted; prototype B has none.
@@ -382,6 +419,7 @@
   --jack-border: 1px solid #181c1f;
   --jack-radius: 2px;
   --jack-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --jack-connected-bg: #3a444f;
   --latch-bg: #8b96a3;
   --led-off: #24292e;
   --led-on: #3ee06a;
@@ -402,6 +440,7 @@
   --vents-opacity: 0.5;
   --sfp-bg: #050607;
   --sfp-border: #6d7783;
+  --sfp-connected-bg: #2a3540;
   --sfp-image: linear-gradient(180deg, #050607, #101316);
 }
 
@@ -451,6 +490,7 @@
   --jack-border: 1px solid #8ec6f5;
   --jack-radius: 1px;
   --jack-shadow: none;
+  --jack-connected-bg: rgba(125, 211, 252, 0.3);
   --latch-bg: #7dd3fc;
   --led-off: rgba(255, 255, 255, 0.1);
   --led-on: #7dd3fc;
@@ -471,6 +511,7 @@
   --vents-opacity: 0.3;
   --sfp-bg: rgba(4, 18, 34, 0.35);
   --sfp-border: #8ec6f5;
+  --sfp-connected-bg: rgba(125, 211, 252, 0.22);
   --sfp-image: repeating-linear-gradient(
     45deg,
     rgba(142, 198, 245, 0.35) 0 1px,

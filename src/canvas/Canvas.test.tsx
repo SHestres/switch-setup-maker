@@ -113,4 +113,26 @@ describe('Canvas', () => {
     expect(onSelectSwitch).not.toHaveBeenCalled()
     expect(onClearSelection).not.toHaveBeenCalled()
   })
+
+  it('draws the restored connections inside the canvas transform', () => {
+    render(<Canvas document={sampleDocument()} />)
+
+    const layer = screen.getByTestId('wire-layer')
+    expect(layer.closest('#canvas-content')).not.toBeNull()
+    expect(layer.querySelectorAll('path')).toHaveLength(1)
+  })
+
+  it('marks connected ports so their jack fill changes, both ends of the wire', () => {
+    render(<Canvas document={sampleDocument()} />)
+
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).not.toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' })).toHaveClass(
+      'connected',
+    )
+  })
 })

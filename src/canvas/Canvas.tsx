@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
@@ -6,6 +6,7 @@ import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zo
 import type { PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
 
 import { Faceplate } from './Faceplate'
+import { WireLayer } from './WireLayer'
 import type { Size } from './placement'
 import './faceplate.css'
 
@@ -39,6 +40,20 @@ function sameViewport(a: Viewport, b: Viewport): boolean {
   return a.x === b.x && a.y === b.y && a.zoom === b.zoom
 }
 
+function portKey(ref: PortRef): string {
+  return `${ref.switch}:${ref.port}`
+}
+
+/** Every connected port in the setup, as `switch:port` keys, in one pass. */
+function connectedPortKeys(connections: SetupDocument['setup']['connections']): Set<string> {
+  const keys = new Set<string>()
+  for (const { a, b } of connections) {
+    keys.add(portKey(a))
+    keys.add(portKey(b))
+  }
+  return keys
+}
+
 /**
  * The pannable, zoomable workspace. Pan/zoom is delegated to
  * react-zoom-pan-pinch; switch drag, selection and port clicks are ours.
@@ -57,6 +72,10 @@ export function Canvas({
 }: CanvasProps) {
   const viewport = document.ui.viewport
   const switches = document.setup.switches
+  const connectedPorts = useMemo(
+    () => connectedPortKeys(document.setup.connections),
+    [document.setup.connections],
+  )
 
   const rootRef = useRef<HTMLDivElement | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null)
@@ -196,12 +215,14 @@ export function Canvas({
                 x={drag?.id === switch_.id ? drag.x : switch_.x}
                 y={drag?.id === switch_.id ? drag.y : switch_.y}
                 selected={switch_.id === selectedSwitchId}
+                connectedPorts={connectedPorts}
                 onMouseDown={(event) => beginDrag(event, switch_)}
                 onClick={handleSwitchClick(switch_)}
                 onPortClick={onPortClick}
               />
             ))}
             {draft && <Faceplate switch_={draft} x={draft.x} y={draft.y} ghost />}
+            <WireLayer setup={document.setup} />
           </div>
         </TransformComponent>
       </TransformWrapper>
