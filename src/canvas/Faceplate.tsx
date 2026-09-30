@@ -10,6 +10,8 @@ export interface FaceplateProps {
   x: number
   y: number
   selected?: boolean
+  /** Connected ports as `switch:port` keys, so jacks can show a wired fill. */
+  connectedPorts?: ReadonlySet<string>
   onMouseDown?: (event: MouseEvent<HTMLDivElement>) => void
   onClick?: (event: MouseEvent<HTMLDivElement>) => void
   onPortClick?: (ref: PortRef) => void
@@ -21,6 +23,7 @@ export function Faceplate({
   x,
   y,
   selected = false,
+  connectedPorts,
   onMouseDown,
   onClick,
   onPortClick,
@@ -64,6 +67,7 @@ export function Faceplate({
               rows={banks.left}
               switchId={switch_.id}
               switchName={name}
+              connectedPorts={connectedPorts}
               onPortClick={onPortClick}
             />
           )}
@@ -71,6 +75,7 @@ export function Faceplate({
             rows={banks.main}
             switchId={switch_.id}
             switchName={name}
+            connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
           {banks.right.length > 0 && (
@@ -78,6 +83,7 @@ export function Faceplate({
               rows={banks.right}
               switchId={switch_.id}
               switchName={name}
+              connectedPorts={connectedPorts}
               onPortClick={onPortClick}
             />
           )}
@@ -99,10 +105,11 @@ interface BankProps {
   rows: readonly Row[]
   switchId: string
   switchName: string
+  connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function MainBank({ rows, switchId, switchName, onPortClick }: BankProps) {
+function MainBank({ rows, switchId, switchName, connectedPorts, onPortClick }: BankProps) {
   return (
     <div className="bank main">
       {pairRows(rows).map(([top, bottom], index) => (
@@ -112,6 +119,7 @@ function MainBank({ rows, switchId, switchName, onPortClick }: BankProps) {
             row={top}
             switchId={switchId}
             switchName={switchName}
+            connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
           {bottom && (
@@ -120,6 +128,7 @@ function MainBank({ rows, switchId, switchName, onPortClick }: BankProps) {
                 row={bottom}
                 switchId={switchId}
                 switchName={switchName}
+                connectedPorts={connectedPorts}
                 onPortClick={onPortClick}
               />
               <LabelRow row={bottom} />
@@ -131,7 +140,7 @@ function MainBank({ rows, switchId, switchName, onPortClick }: BankProps) {
   )
 }
 
-function UplinkBank({ rows, switchId, switchName, onPortClick }: BankProps) {
+function UplinkBank({ rows, switchId, switchName, connectedPorts, onPortClick }: BankProps) {
   return (
     <div className="bank uplink">
       <span className="bank-label">{bankLabel(rows)}</span>
@@ -142,6 +151,7 @@ function UplinkBank({ rows, switchId, switchName, onPortClick }: BankProps) {
             row={row}
             switchId={switchId}
             switchName={switchName}
+            connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
         ))}
@@ -154,10 +164,11 @@ interface PortRowProps {
   row: Row
   switchId: string
   switchName: string
+  connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function PortRow({ row, switchId, switchName, onPortClick }: PortRowProps) {
+function PortRow({ row, switchId, switchName, connectedPorts, onPortClick }: PortRowProps) {
   return (
     <div className="row">
       {row.ports.map((port) => (
@@ -166,6 +177,7 @@ function PortRow({ row, switchId, switchName, onPortClick }: PortRowProps) {
           port={port}
           switchId={switchId}
           switchName={switchName}
+          connectedPorts={connectedPorts}
           onPortClick={onPortClick}
         />
       ))}
@@ -177,16 +189,18 @@ interface PortButtonProps {
   port: Port
   switchId: string
   switchName: string
+  connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function PortButton({ port, switchId, switchName, onPortClick }: PortButtonProps) {
+function PortButton({ port, switchId, switchName, connectedPorts, onPortClick }: PortButtonProps) {
   const kind = port.kind === 'sfp+' ? 'sfpp' : port.kind
   const isCage = port.kind !== 'rj45'
+  const connected = connectedPorts?.has(`${switchId}:${port.id}`) ?? false
   return (
     <button
       type="button"
-      className={`port kind-${kind}`}
+      className={`port kind-${kind}${connected ? ' connected' : ''}`}
       data-port={port.id}
       aria-label={portAriaLabel(port, switchName)}
       onClick={(event) => {

@@ -681,3 +681,68 @@ describe('themes', () => {
     expect(screen.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'false')
   })
 })
+
+describe('wires', () => {
+  function wireLayer(): HTMLElement {
+    return screen.getByTestId('wire-layer')
+  }
+
+  it('renders every connection from a restored setup, including same-switch links', () => {
+    const restored = sampleDocument()
+    restored.setup.connections.push({
+      a: { switch: 'sw1', port: 'p2' },
+      b: { switch: 'sw1', port: 'p49' },
+    })
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(restored))
+
+    render(<App />)
+
+    expect(wireLayer().querySelectorAll('path')).toHaveLength(2)
+    expect(wireLayer().querySelector('[data-connection="sw1:p1-sw2:p2"]')).toBeInTheDocument()
+    expect(wireLayer().querySelector('[data-connection="sw1:p2-sw1:p49"]')).toBeInTheDocument()
+  })
+
+  it('renders wires from an imported setup', async () => {
+    render(<App />)
+
+    importFile(jsonFile(sampleDocument()))
+
+    expect(await screen.findByText('Core')).toBeInTheDocument()
+    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
+  })
+
+  it('gives connected ports the wired jack class, restored across a refresh', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    const app = render(<App />)
+
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).not.toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' })).toHaveClass(
+      'connected',
+    )
+
+    app.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toHaveClass(
+      'connected',
+    )
+    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
+  })
+
+  it('keeps port clicks inert: no pending wire and no document change', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Edge' }))
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
+  })
+})
