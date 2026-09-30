@@ -2,9 +2,10 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
 import { exportDocumentFile, importDocumentFile } from '@/model/files'
-import type { SetupDocument, Theme } from '@/model/types'
+import type { CableLayer, SetupDocument, Theme } from '@/model/types'
 
 import { secondaryButton } from './buttonStyles'
+import { CableLayerControl } from './CableLayerControl'
 import { Dialog } from './Dialog'
 import { ThemeControl } from './ThemeControl'
 
@@ -14,6 +15,7 @@ interface AppBarProps {
   onNewSetup: () => void
   onAddSwitch: () => void
   onThemeChange: (theme: Theme) => void
+  onCableLayerChange: (cableLayer: CableLayer) => void
 }
 
 /**
@@ -26,6 +28,7 @@ export function AppBar({
   onNewSetup,
   onAddSwitch,
   onThemeChange,
+  onCableLayerChange,
 }: AppBarProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -63,6 +66,11 @@ export function AppBar({
       <h1 className="mr-auto text-sm font-semibold tracking-tight">Switch Setup Maker</h1>
 
       <ThemeControl theme={document.ui.theme} onThemeChange={onThemeChange} />
+
+      <CableLayerControl
+        cableLayer={document.ui.cableLayer}
+        onCableLayerChange={onCableLayerChange}
+      />
 
       <button type="button" className={secondaryButton} onClick={onAddSwitch}>
         + Add switch

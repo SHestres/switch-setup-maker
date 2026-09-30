@@ -60,10 +60,12 @@
 
 /*
  * One SVG for every Connection, drawn inside the canvas transform. Its 1x1
- * viewport grows visually via `overflow: visible`. The cable-above/behind
- * ordering is ticket 23's; until then the layer paints over the faceplates.
+ * viewport grows visually via `overflow: visible`. Whether it paints above or
+ * behind the faceplates is decided by the Canvas's layer order; the ephemeral
+ * pending wire lives in its own always-above layer.
  */
-.canvas-root .wire-layer {
+.canvas-root .wire-layer,
+.canvas-root .pending-wire-layer {
   position: absolute;
   top: 0;
   left: 0;
@@ -71,15 +73,50 @@
   pointer-events: none;
 }
 
-.canvas-root .wire-layer path {
+.canvas-root .wire-layer path,
+.canvas-root .pending-wire-layer path {
   fill: none;
   stroke: var(--wire);
   stroke-width: calc(var(--wire-width) * 1px);
   stroke-linecap: round;
 }
 
+/* The invisible hit target over each cable: prototype-width, comfortably clickable. */
+.canvas-root .wire-layer path.wire-hit {
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* Hovering a cable highlights it, the prototype's cue that it is clickable. */
+.canvas-root .wire-layer g.wire:hover path.wire {
+  stroke: var(--wire-hover);
+}
+
+/* The selected cable, highlighted in the theme's wire highlight colour. */
+.canvas-root .wire-layer path.selected {
+  stroke: var(--wire-hover);
+  stroke-width: calc(var(--wire-width) * 1.5 * 1px);
+}
+
+/* The mouse-only delete affordance, centred on the selected cable's midpoint. */
+.canvas-root .wire-actions {
+  position: absolute;
+  z-index: 6;
+  padding: 3px 8px;
+  border: 1px solid var(--wire-hover);
+  border-radius: 6px;
+  background: var(--face-bg);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
 /* The ephemeral wire following the pointer: dashed, in the theme accent. */
-.canvas-root .wire-layer path.pending {
+.canvas-root .pending-wire-layer path.pending {
   stroke: var(--accent);
   stroke-dasharray: 7 5;
 }

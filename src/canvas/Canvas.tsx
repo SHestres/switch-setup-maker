@@ -4,9 +4,10 @@ import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
 
 import { sameRef } from '@/model/connections'
-import type { PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
+import type { Connection, PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
 
 import { Faceplate } from './Faceplate'
+import { PendingWire } from './PendingWire'
 import { WireHint } from './WireHint'
 import { WireLayer } from './WireLayer'
 import type { Point } from './geometry'
@@ -36,6 +37,10 @@ export interface CanvasProps {
   onSelectSwitch?: (switchId: string) => void
   onClearSelection?: () => void
   onPortClick?: (ref: PortRef) => void
+  /** The selected Connection, by unordered pair; ephemeral UI state. */
+  selectedConnection?: Connection | null
+  onSelectConnection?: (connection: Connection) => void
+  onDeleteConnection?: (connection: Connection) => void
   /** The Port a pending wire starts from, when one is being drawn. */
   pendingPort?: PortRef | null
   /** A connection refusal to show near the offending Port. */
@@ -76,6 +81,9 @@ export function Canvas({
   onSelectSwitch,
   onClearSelection,
   onPortClick,
+  selectedConnection = null,
+  onSelectConnection,
+  onDeleteConnection,
   pendingPort = null,
   hint = null,
   onCanvasSizeChange,
@@ -85,6 +93,17 @@ export function Canvas({
   const connectedPorts = useMemo(
     () => connectedPortKeys(document.setup.connections),
     [document.setup.connections],
+  )
+  // The blueprint theme always draws cables above; the stored preference is
+  // left untouched for the other themes.
+  const cablesAbove = document.ui.theme === 'blueprint' || document.ui.cableLayer === 'above'
+  const cablesLayer = (
+    <WireLayer
+      setup={document.setup}
+      selected={selectedConnection}
+      onSelectConnection={onSelectConnection}
+      onDeleteConnection={onDeleteConnection}
+    />
   )
 
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -236,7 +255,7 @@ export function Canvas({
         maxScale={MAX_ZOOM}
         limitToBounds={false}
         centerOnInit={false}
-        panning={{ velocityDisabled: true, excluded: ['button', 'switch'] }}
+        panning={{ velocityDisabled: true, excluded: ['button', 'switch', 'wire-hit'] }}
         onTransform={(_ref, state) => {
           scaleRef.current = state.scale
           transformStateRef.current = {
@@ -254,6 +273,8 @@ export function Canvas({
           contentProps={{ id: CANVAS_CONTENT_ID }}
         >
           <div className="canvas-stage" data-testid="canvas-stage">
+            {/* Cables paint before the switches when behind, after them when above. */}
+            {!cablesAbove && cablesLayer}
             {switches.map((switch_) => (
               <Faceplate
                 key={switch_.id}
@@ -269,7 +290,8 @@ export function Canvas({
               />
             ))}
             {draft && <Faceplate switch_={draft} x={draft.x} y={draft.y} ghost />}
-            <WireLayer
+            {cablesAbove && cablesLayer}
+            <PendingWire
               setup={document.setup}
               pending={
                 pendingPort

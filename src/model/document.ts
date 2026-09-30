@@ -86,3 +86,8 @@ export function setViewport(document: SetupDocument, viewport: Viewport): SetupD
 export function setTheme(document: SetupDocument, theme: Theme): SetupDocument {
   return { ...document, ui: { ...document.ui, theme } }
 }
+
+/** Switch the persisted cable layer without touching the rest of the ui state. */
+export function setCableLayer(document: SetupDocument, cableLayer: CableLayer): SetupDocument {
+  return { ...document, ui: { ...document.ui, cableLayer } }
+}

@@ -159,13 +159,8 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-/**
- * SVG path from one port anchor to another. Cables leave Ports vertically: the
- * first control point sits above/below the start, the second below/above the
- * end. Roughly level Ports (same row, or within LEVEL_GAP) both exit downwards
- * and the cable hangs in a sag.
- */
-export function wireCurve(a: Point, b: Point): string {
+/** The two control points of the cable between `a` and `b`. */
+function wireControls(a: Point, b: Point): { c1: Point; c2: Point } {
   const dy = b.y - a.y
   let fromY: number
   let toY: number
@@ -179,7 +174,32 @@ export function wireCurve(a: Point, b: Point): string {
     fromY = a.y + bow
     toY = b.y + bow
   }
-  return `M ${round2(a.x)} ${round2(a.y)} C ${round2(a.x)} ${round2(fromY)}, ${round2(b.x)} ${round2(toY)}, ${round2(b.x)} ${round2(b.y)}`
+  return { c1: { x: a.x, y: fromY }, c2: { x: b.x, y: toY } }
+}
+
+/**
+ * SVG path from one port anchor to another. Cables leave Ports vertically: the
+ * first control point sits above/below the start, the second below/above the
+ * end. Roughly level Ports (same row, or within LEVEL_GAP) both exit downwards
+ * and the cable hangs in a sag.
+ */
+export function wireCurve(a: Point, b: Point): string {
+  const { c1, c2 } = wireControls(a, b)
+  return `M ${round2(a.x)} ${round2(a.y)} C ${round2(c1.x)} ${round2(c1.y)}, ${round2(c2.x)} ${round2(c2.y)}, ${round2(b.x)} ${round2(b.y)}`
+}
+
+/** A point on the cable's cubic curve, at `t` 0 to 1. */
+export function wirePoint(a: Point, b: Point, t: number): Point {
+  const { c1, c2 } = wireControls(a, b)
+  const inv = 1 - t
+  const wa = inv * inv * inv
+  const wc1 = 3 * inv * inv * t
+  const wc2 = 3 * inv * t * t
+  const wb = t * t * t
+  return {
+    x: round2(wa * a.x + wc1 * c1.x + wc2 * c2.x + wb * b.x),
+    y: round2(wa * a.y + wc1 * c1.y + wc2 * c2.y + wb * b.y),
+  }
 }
 
 /** The SVG path for one Connection, or undefined when a referenced Port is gone. */
@@ -188,6 +208,14 @@ export function connectionCurve(setup: Setup, connection: Connection): string | 
   const b = pointForPort(setup, connection.b)
   if (!a || !b) return undefined
   return wireCurve(a, b)
+}
+
+/** The curve midpoint of one Connection, where selection affordances anchor. */
+export function connectionMidpoint(setup: Setup, connection: Connection): Point | undefined {
+  const a = pointForPort(setup, connection.a)
+  const b = pointForPort(setup, connection.b)
+  if (!a || !b) return undefined
+  return wirePoint(a, b, 0.5)
 }
 
 /** Where a Port ref's anchor sits in canvas coordinates, when it exists. */

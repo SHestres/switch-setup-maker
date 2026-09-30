@@ -697,7 +697,7 @@ describe('wires', () => {
 
     render(<App />)
 
-    expect(wireLayer().querySelectorAll('path')).toHaveLength(2)
+    expect(wireLayer().querySelectorAll('path[data-connection]')).toHaveLength(2)
     expect(wireLayer().querySelector('[data-connection="sw1:p1-sw2:p2"]')).toBeInTheDocument()
     expect(wireLayer().querySelector('[data-connection="sw1:p2-sw1:p49"]')).toBeInTheDocument()
   })
@@ -708,7 +708,7 @@ describe('wires', () => {
     importFile(jsonFile(sampleDocument()))
 
     expect(await screen.findByText('Core')).toBeInTheDocument()
-    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
+    expect(wireLayer().querySelectorAll('path[data-connection]')).toHaveLength(1)
   })
 
   it('gives connected ports the wired jack class, restored across a refresh', () => {
@@ -731,7 +731,7 @@ describe('wires', () => {
     expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toHaveClass(
       'connected',
     )
-    expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
+    expect(wireLayer().querySelectorAll('path[data-connection]')).toHaveLength(1)
   })
 })
 
@@ -754,6 +754,11 @@ function storedConnections(): Array<{
 }> {
   const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
   return stored.setup.connections
+}
+
+function storedCableLayer(): string {
+  const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  return stored.ui.cableLayer
 }
 
 /** The sample setup plus a second link so a structural edit can sever a count of two. */
@@ -1038,7 +1043,7 @@ function wireLayerElement(): HTMLElement {
 }
 
 function pendingPath(): SVGPathElement | null {
-  return wireLayerElement().querySelector<SVGPathElement>('[data-pending]')
+  return document.querySelector<SVGPathElement>('[data-pending]')
 }
 
 describe('wiring', () => {
@@ -1441,5 +1446,188 @@ describe('draft switch', () => {
     expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
     expect(storedSwitches()).toHaveLength(2)
     expect(storedSwitches().some((switch_) => switch_.name === 'Rack A')).toBe(false)
+  })
+})
+
+describe('managing cables', () => {
+  function cableHit(key = 'sw1:p1-sw2:p2'): SVGPathElement {
+    const hit = wireLayerElement().querySelector<SVGPathElement>(`[data-wire-hit="${key}"]`)
+    if (!hit) throw new Error(`cable ${key} is not rendered`)
+    return hit
+  }
+
+  function cableCurve(key = 'sw1:p1-sw2:p2'): SVGPathElement | null {
+    return wireLayerElement().querySelector<SVGPathElement>(`[data-connection="${key}"]`)
+  }
+
+  it('selects a cable by click, deletes it with the affordance, frees both ports and survives a refresh', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    const app = render(<App />)
+
+    fireEvent.click(cableHit())
+
+    expect(cableCurve()).toHaveClass('selected')
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+    const before = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete cable' }))
+
+    expect(cableCurve()).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete cable' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).not.toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' })).not.toHaveClass(
+      'connected',
+    )
+    expect(storedConnections()).toHaveLength(0)
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBe(before)
+
+    app.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).not.toHaveClass(
+      'connected',
+    )
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Edge' })).not.toHaveClass(
+      'connected',
+    )
+    expect(wireLayerElement().querySelectorAll('path[data-connection]')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Delete cable' })).not.toBeInTheDocument()
+  })
+
+  it('deletes the selected cable with the Delete key and deselects it with Escape', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+
+    fireEvent.click(cableHit())
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(cableCurve()).not.toHaveClass('selected')
+    expect(screen.queryByRole('button', { name: 'Delete cable' })).not.toBeInTheDocument()
+
+    fireEvent.click(cableHit())
+    fireEvent.keyDown(window, { key: 'Delete' })
+
+    expect(cableCurve()).not.toBeInTheDocument()
+    expect(storedConnections()).toHaveLength(0)
+  })
+
+  it('never deletes a selected cable while the user is typing in the inspector', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+    fireEvent.click(cableHit())
+
+    fireEvent.keyDown(within(inspector()).getByLabelText('Name'), { key: 'Backspace' })
+    fireEvent.keyDown(within(inspector()).getByLabelText('Model'), { key: 'Delete' })
+
+    expect(cableCurve()).toBeInTheDocument()
+    expect(cableCurve()).toHaveClass('selected')
+    expect(storedConnections()).toHaveLength(1)
+  })
+
+  it('keeps cable and switch selection isolated', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+
+    fireEvent.click(cableHit())
+    expect(cableCurve()).toHaveClass('selected')
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+    expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
+    expect(cableCurve()).not.toHaveClass('selected')
+    expect(screen.queryByRole('button', { name: 'Delete cable' })).not.toBeInTheDocument()
+
+    fireEvent.click(cableHit())
+    expect(cableCurve()).toHaveClass('selected')
+    expect(within(inspector()).getByLabelText('Name')).toHaveValue('Core')
+
+    fireEvent.click(screen.getByTestId('canvas-stage'))
+    expect(cableCurve()).not.toHaveClass('selected')
+  })
+
+  describe('cable layer', () => {
+    function stagePositions(): { layer: number; core: number } {
+      const children = [...screen.getByTestId('canvas-stage').children]
+      return {
+        layer: children.indexOf(wireLayerElement()),
+        core: children.indexOf(screen.getByRole('group', { name: 'Core' })),
+      }
+    }
+
+    it('orders cables behind or above the switches and keeps the choice across a refresh', () => {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      const app = render(<App />)
+
+      expect(screen.getByRole('button', { name: 'Cables behind' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      // Behind the switches: the layer paints before the faceplates.
+      expect(stagePositions().layer).toBeLessThan(stagePositions().core)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cables above' }))
+
+      expect(screen.getByRole('button', { name: 'Cables above' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(stagePositions().layer).toBeGreaterThan(stagePositions().core)
+      const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+      expect(stored.ui.cableLayer).toBe('above')
+
+      app.unmount()
+      render(<App />)
+
+      expect(screen.getByRole('button', { name: 'Cables above' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(stagePositions().layer).toBeGreaterThan(stagePositions().core)
+    })
+
+    it('keeps the wire being drawn above the switches even with cables behind', () => {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      render(<App />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
+
+      const children = [...screen.getByTestId('canvas-stage').children]
+      expect(children.indexOf(screen.getByTestId('pending-wire-layer'))).toBeGreaterThan(
+        children.indexOf(screen.getByRole('group', { name: 'Core' })),
+      )
+    })
+
+    it('always draws cables above in blueprint while the stored preference stays intact', () => {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      render(<App />)
+      expect(stagePositions().layer).toBeLessThan(stagePositions().core)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Blueprint' }))
+
+      expect(canvasRoot()).toHaveAttribute('data-theme', 'blueprint')
+      expect(stagePositions().layer).toBeGreaterThan(stagePositions().core)
+      expect(screen.getByRole('button', { name: 'Cables behind' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      expect(storedCableLayer()).toBe('behind')
+
+      // Toggling the stored preference never moves the blueprint drawing.
+      fireEvent.click(screen.getByRole('button', { name: 'Cables above' }))
+      expect(stagePositions().layer).toBeGreaterThan(stagePositions().core)
+      fireEvent.click(screen.getByRole('button', { name: 'Cables behind' }))
+      expect(stagePositions().layer).toBeGreaterThan(stagePositions().core)
+      expect(storedCableLayer()).toBe('behind')
+
+      // Leaving blueprint applies the stored preference again.
+      fireEvent.click(screen.getByRole('button', { name: 'Light' }))
+      expect(stagePositions().layer).toBeLessThan(stagePositions().core)
+    })
   })
 })
