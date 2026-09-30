@@ -746,3 +746,302 @@ describe('wires', () => {
     expect(wireLayer().querySelectorAll('path')).toHaveLength(1)
   })
 })
+
+interface StoredLayout {
+  numbering: string
+  rows: Array<{
+    numbering?: string
+    ports: Array<{ id: string; label: string; kind: string; speed: string }>
+  }>
+}
+
+function storedLayout(index = 0): StoredLayout {
+  const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  return stored.setup.switches[index].layout as StoredLayout
+}
+
+function storedConnections(): Array<{
+  a: { switch: string; port: string }
+  b: { switch: string; port: string }
+}> {
+  const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  return stored.setup.connections
+}
+
+/** The sample setup plus a second link so a structural edit can sever a count of two. */
+function sampleWithTwoLinks(): SetupDocument {
+  const document = sampleDocument()
+  document.setup.connections.push({
+    a: { switch: 'sw1', port: 'p2' },
+    b: { switch: 'sw2', port: 'p1' },
+  })
+  return document
+}
+
+function openCoreEditor(): void {
+  fireEvent.click(screen.getByRole('group', { name: 'Core' }))
+}
+
+describe('switch layout editor', () => {
+  it('shows the row controls for the selected switch and autosaves a count change live', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+
+    openCoreEditor()
+    const panel = inspector()
+    expect(within(panel).getByLabelText('Port numbering')).toHaveValue('odd-top-even-bottom')
+    expect(within(panel).getByLabelText('Row 1 port count')).toHaveValue(2)
+    expect(within(panel).getByLabelText('Row 1 port kind')).toHaveValue('rj45')
+    expect(within(panel).getByLabelText('Row 1 port speed')).toHaveValue('1G')
+    expect(within(panel).queryByLabelText('Row 1 numbering')).not.toBeInTheDocument()
+    expect(within(panel).getByLabelText('Row 2 port count')).toHaveValue(1)
+    expect(within(panel).getByLabelText('Row 2 port kind')).toHaveValue('sfp+')
+    expect(within(panel).getByLabelText('Row 2 numbering')).toHaveValue('start-over')
+
+    fireEvent.change(within(panel).getByLabelText('Row 1 port count'), { target: { value: '3' } })
+    fireEvent.blur(within(panel).getByLabelText('Row 1 port count'))
+
+    // A lone top row numbers sequentially; the start-over SFP row stays 1. The new port mints p50.
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'SFP+ port 1 (10G) on Core' })).toBeInTheDocument()
+    expect(storedLayout().rows[0].ports.map((port) => port.label)).toEqual(['1', '2', '3'])
+    expect(storedLayout().rows[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p50'])
+  })
+
+  it('marks an out-of-range count inline and never commits it', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+    const count = within(panel).getByLabelText('Row 1 port count')
+
+    fireEvent.change(count, { target: { value: '49' } })
+
+    expect(count).toHaveAttribute('aria-invalid', 'true')
+    expect(within(panel).getByText('Enter a whole number from 1 to 48.')).toBeInTheDocument()
+    expect(storedLayout().rows[0].ports).toHaveLength(2)
+
+    fireEvent.blur(count)
+
+    expect(count).toHaveValue(2)
+    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
+
+    fireEvent.change(count, { target: { value: '0' } })
+    expect(count).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.keyDown(count, { key: 'Enter' })
+    expect(storedLayout().rows[0].ports).toHaveLength(2)
+  })
+
+  it('moves a row’s numbering default with its kind, and keeps an explicit override', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+    const kind = within(panel).getByLabelText('Row 2 port kind')
+    const numbering = within(panel).getByLabelText('Row 2 numbering')
+
+    fireEvent.change(kind, { target: { value: 'rj45' } })
+
+    expect(numbering).toHaveValue('continue')
+    expect(storedLayout().rows[1].ports[0]).toMatchObject({ kind: 'rj45' })
+    expect(storedLayout().rows[1].ports[0].label).toBe('2')
+
+    fireEvent.change(kind, { target: { value: 'sfp+' } })
+
+    expect(numbering).toHaveValue('start-over')
+
+    fireEvent.change(numbering, { target: { value: 'continue' } })
+    fireEvent.change(kind, { target: { value: 'sfp' } })
+
+    expect(numbering).toHaveValue('continue')
+    expect(storedLayout().rows[1].numbering).toBe('continue')
+  })
+
+  it('edits a row’s speed and regenerates its port labels live', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.change(within(panel).getByLabelText('Row 2 port speed'), { target: { value: '1G' } })
+
+    expect(screen.getByRole('button', { name: 'SFP+ port 1 (1G) on Core' })).toBeInTheDocument()
+    expect(storedLayout().rows[1].ports[0].speed).toBe('1G')
+  })
+
+  it('changes the whole numbering preset, relabelling every row and keeping connections', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.change(within(panel).getByLabelText('Port numbering'), {
+      target: { value: 'sequential' },
+    })
+
+    expect(storedLayout().numbering).toBe('sequential')
+    expect(storedLayout().rows.map((row) => row.ports.map((port) => port.label))).toEqual([
+      ['1', '2'],
+      ['1'],
+    ])
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
+
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.setup.connections).toHaveLength(1)
+    expect(stored.setup.connections[0].a).toEqual({ switch: 'sw1', port: 'p1' })
+  })
+
+  it('appends a row with fresh ports, default numbering and autosave, without a confirm', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add row' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    const appended = storedLayout().rows[2]
+    expect(appended.numbering).toBe('continue')
+    expect(appended.ports).toHaveLength(12)
+    expect(appended.ports[0]).toMatchObject({ id: 'p50', kind: 'rj45', speed: '1G' })
+    expect(appended.ports[11]).toMatchObject({ id: 'p61', label: '13' })
+    expect(within(panel).getByLabelText('Row 3 port count')).toHaveValue(12)
+  })
+
+  it('removes an unconnected row immediately and never lets the last row go', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 2' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().rows).toHaveLength(1)
+    expect(
+      screen.queryByRole('button', { name: 'SFP+ port 1 (10G) on Core' }),
+    ).not.toBeInTheDocument()
+    // A lone row numbers sequentially again: 1 and 2.
+    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Remove row 1' })).toBeDisabled()
+    expect(
+      JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').setup.connections,
+    ).toHaveLength(1)
+  })
+
+  it('confirms a count that would sever a connection, and can cancel it', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+    const count = within(panel).getByLabelText('Row 1 port count')
+
+    fireEvent.change(count, { target: { value: '1' } })
+    fireEvent.blur(count)
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Change layout?')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(count).toHaveValue(2)
+    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    expect(storedConnections()).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
+  })
+
+  it('severs the connections and autosaves once the count change is confirmed', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const count = within(screen.getByRole('complementary')).getByLabelText('Row 1 port count')
+
+    fireEvent.change(count, { target: { value: '1' } })
+    fireEvent.blur(count)
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }))
+
+    expect(storedLayout().rows[0].ports.map((port) => port.id)).toEqual(['p1'])
+    expect(storedConnections()).toEqual([
+      { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p2' } },
+    ])
+    expect(
+      screen.queryByRole('button', { name: 'RJ45 port 3 (1G) on Core' }),
+    ).not.toBeInTheDocument()
+    expect(count).toHaveValue(1)
+  })
+
+  it('confirms a row removal naming the switch and the connections to sever', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 1' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Change layout?')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 2 connections.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(storedLayout().rows).toHaveLength(2)
+    expect(storedConnections()).toHaveLength(2)
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 1' }))
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Apply' }),
+    )
+
+    expect(storedLayout().rows).toHaveLength(1)
+    expect(storedLayout().rows[0].ports[0].id).toBe('p49')
+    expect(storedConnections()).toEqual([])
+  })
+
+  it('deletes a switch only after a confirm naming it and its connections', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Delete switch' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Delete switch?')
+    expect(dialog).toHaveTextContent('Deleting Core severs 2 connections.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('group', { name: 'Core' })).toBeInTheDocument()
+    expect(within(panel).getByLabelText('Name')).toHaveValue('Core')
+    expect(storedConnections()).toHaveLength(2)
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Delete switch' }))
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    )
+
+    expect(screen.queryByRole('group', { name: 'Core' })).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Edge' })).toBeInTheDocument()
+    expect(storedConnections()).toEqual([])
+    expect(
+      screen.queryByRole('complementary', { name: 'Switch inspector' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('still confirms deleting a switch with no connections', async () => {
+    const document = sampleDocument()
+    document.setup.connections = []
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(document))
+    render(<App />)
+    fireEvent.click(screen.getByRole('group', { name: 'Edge' }))
+
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Delete switch' }))
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Deleting Edge severs no connections.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(screen.queryByRole('group', { name: 'Edge' })).not.toBeInTheDocument()
+    expect(storedLayout()).toBeDefined()
+  })
+})
