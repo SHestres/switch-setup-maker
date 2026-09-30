@@ -59,14 +59,25 @@ npx serve dist
 
 ### Docker
 
+Compose is the easiest route:
+
+```sh
+docker compose up --build
+```
+
+The app is served on <http://localhost:8080>. Stop it with `docker compose down` (or `Ctrl-C`
+in the foreground). The equivalent plain Docker commands:
+
 ```sh
 docker build -t switch-setup-maker .
 docker run --rm -p 8080:8080 switch-setup-maker
 ```
 
-No configuration is required and the port is overridable:
+No configuration is required and the port is overridable — `PORT` drives both the container and
+the published port:
 
 ```sh
+PORT=3000 docker compose up --build   # -> http://localhost:3000
 docker run --rm -e PORT=3000 -p 3000:3000 switch-setup-maker
 ```
 
