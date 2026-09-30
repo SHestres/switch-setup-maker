@@ -11,13 +11,14 @@ interface AppBarProps {
   document: SetupDocument
   onReplace: (document: SetupDocument) => void
   onNewSetup: () => void
+  onAddSwitch: () => void
 }
 
 /**
  * The persistence half of ticket 06's app bar: Import, Export and New setup.
  * The builder and canvas tickets add their own controls alongside these.
  */
-export function AppBar({ document, onReplace, onNewSetup }: AppBarProps) {
+export function AppBar({ document, onReplace, onNewSetup, onAddSwitch }: AppBarProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -52,6 +53,10 @@ export function AppBar({ document, onReplace, onNewSetup }: AppBarProps) {
   return (
     <header className="flex items-center gap-2 border-b border-border bg-card px-4 py-2">
       <h1 className="mr-auto text-sm font-semibold tracking-tight">Switch Setup Maker</h1>
+
+      <button type="button" className={secondaryButton} onClick={onAddSwitch}>
+        + Add switch
+      </button>
 
       <input
         ref={fileInput}

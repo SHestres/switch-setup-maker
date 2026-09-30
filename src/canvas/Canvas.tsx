@@ -6,6 +6,7 @@ import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zo
 import type { PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
 
 import { Faceplate } from './Faceplate'
+import type { Size } from './placement'
 import './faceplate.css'
 
 export const CANVAS_CONTENT_ID = 'canvas-content'
@@ -28,6 +29,8 @@ export interface CanvasProps {
   onSelectSwitch?: (switchId: string) => void
   onClearSelection?: () => void
   onPortClick?: (ref: PortRef) => void
+  /** The rendered container size, so placement can land on the visible centre. */
+  onCanvasSizeChange?: (size: Size) => void
 }
 
 function sameViewport(a: Viewport, b: Viewport): boolean {
@@ -47,16 +50,37 @@ export function Canvas({
   onSelectSwitch,
   onClearSelection,
   onPortClick,
+  onCanvasSizeChange,
 }: CanvasProps) {
   const viewport = document.ui.viewport
   const switches = document.setup.switches
 
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null)
   const scaleRef = useRef(viewport.zoom)
   const lastViewportRef = useRef(viewport)
   const movedRef = useRef(false)
   const suppressClickRef = useRef(false)
   const [drag, setDrag] = useState<DragPosition | null>(null)
+
+  // Report the rendered size so new switches can be centred on what is visible.
+  useEffect(() => {
+    const element = rootRef.current
+    if (!element || !onCanvasSizeChange) return
+
+    const reportSize = () => {
+      const rect = element.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        onCanvasSizeChange({ width: rect.width, height: rect.height })
+      }
+    }
+
+    reportSize()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(reportSize)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [onCanvasSizeChange])
 
   // Apply viewport changes that come from outside a gesture (import, New setup).
   useEffect(() => {
@@ -134,7 +158,12 @@ export function Canvas({
   }
 
   return (
-    <div className="canvas-root" data-theme={document.ui.theme} onClick={handleBackgroundClick}>
+    <div
+      ref={rootRef}
+      className="canvas-root"
+      data-theme={document.ui.theme}
+      onClick={handleBackgroundClick}
+    >
       <TransformWrapper
         ref={transformRef}
         initialScale={viewport.zoom}

@@ -76,6 +76,20 @@ describe('Canvas', () => {
     expect(onMoveSwitch).not.toHaveBeenCalled()
   })
 
+  it('reports its rendered size so new switches can be centred on what is visible', () => {
+    const onCanvasSizeChange = vi.fn()
+    const rect = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockReturnValue(new DOMRect(0, 0, 1000, 700))
+    try {
+      render(<Canvas document={sampleDocument()} onCanvasSizeChange={onCanvasSizeChange} />)
+
+      expect(onCanvasSizeChange).toHaveBeenCalledWith({ width: 1000, height: 700 })
+    } finally {
+      rect.mockRestore()
+    }
+  })
+
   it('does not select or clear when a drag ends over empty canvas', () => {
     const onMoveSwitch = vi.fn()
     const onSelectSwitch = vi.fn()
