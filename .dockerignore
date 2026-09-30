@@ -1,0 +1,16 @@
+# Dependencies and build output are produced inside the image.
+node_modules
+dist
+coverage
+
+# VCS and agent/planning material are not needed for the build.
+.git
+.scratch
+.agents
+.claude
+agent
+skills-lock.json
+
+# Logs and editor noise.
+*.log
+.DS_Store
