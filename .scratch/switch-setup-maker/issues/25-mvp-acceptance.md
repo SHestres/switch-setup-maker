@@ -1,7 +1,7 @@
 # 25: MVP acceptance pass
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 16, 17, 18, 19, 20, 21, 22, 23, 24
 
 ## What to build
