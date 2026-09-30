@@ -1,7 +1,7 @@
 # 16: Canvas, faceplate & navigation
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately)
 
 ## What to build
