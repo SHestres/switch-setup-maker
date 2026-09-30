@@ -255,6 +255,10 @@ export function Canvas({
         maxScale={MAX_ZOOM}
         limitToBounds={false}
         centerOnInit={false}
+        // `smooth` (the default) makes one wheel notch zoom by
+        // `step * |deltaY|`; 0.0015 lands a standard 100px notch at +0.15
+        // (1.0 -> 1.15) instead of the default +1.5 clamp slam.
+        wheel={{ step: 0.0015 }}
         panning={{ velocityDisabled: true, excluded: ['button', 'switch', 'wire-hit'] }}
         onTransform={(_ref, state) => {
           scaleRef.current = state.scale

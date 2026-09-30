@@ -230,18 +230,28 @@ describe('canvas', () => {
     expect(canvasContent().style.transform).toBe('translate(60px, 30px) scale(1)')
   })
 
-  it('persists zoom after a wheel gesture', () => {
+  it('zooms in gentle proportional steps with the wheel and persists them', () => {
     vi.useFakeTimers()
     try {
       render(<App />)
 
-      fireEvent.wheel(canvasContent(), { deltaY: -120, clientX: 100, clientY: 100 })
+      fireEvent.wheel(canvasContent(), { deltaY: -100, clientX: 100, clientY: 100 })
       act(() => {
         vi.advanceTimersByTime(1000)
       })
+      const first = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
 
-      const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
-      expect(stored.ui.viewport.zoom).toBeGreaterThan(1)
+      fireEvent.wheel(canvasContent(), { deltaY: -100, clientX: 100, clientY: 100 })
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      const second = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+
+      // One standard notch adds ~10–20%; a second keeps stepping, no clamp slam.
+      expect(first.ui.viewport.zoom).toBeGreaterThanOrEqual(1.1)
+      expect(first.ui.viewport.zoom).toBeLessThanOrEqual(1.2)
+      expect(second.ui.viewport.zoom).toBeGreaterThan(first.ui.viewport.zoom)
+      expect(second.ui.viewport.zoom).toBeLessThan(1.5)
     } finally {
       vi.useRealTimers()
     }

@@ -33,6 +33,20 @@ function switchWith(rows: Row[], x = 0, y = 0): Switch {
   }
 }
 
+/** The lowest point of a cubic SVG path, sampled densely (test-side truth). */
+function deepestPoint(d: string): { x: number; y: number } {
+  const [ax, ay, c1x, c1y, c2x, c2y, bx, by] = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+  let best = { x: ax, y: ay }
+  for (let step = 0; step <= 1000; step++) {
+    const t = step / 1000
+    const u = 1 - t
+    const x = u * u * u * ax + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * bx
+    const y = u * u * u * ay + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * by
+    if (y > best.y) best = { x, y }
+  }
+  return best
+}
+
 describe('portAnchor', () => {
   it('centres a main-bank port and an uplink-cage port on a simple faceplate', () => {
     // Face "Core": one 2-port main row + one SFP uplink row on the right.
@@ -151,15 +165,96 @@ describe('connectionCurve', () => {
     )
   })
 
-  it('draws a same-switch link with a hanging sag', () => {
+  it('draws a same-switch link that dips clear of the faceplate it passes under', () => {
     const setup = sampleDocument().setup
 
+    // sw1 "Core" face: 89 high, bottom at 360 + 89 = 449. The cable's lowest
+    // point (0.75 of the control bow below the level anchors at y 409) must
+    // clear that bottom by 8: lowest 457 -> bow (457 - 409) / 0.75 = 64.
     expect(
       connectionCurve(setup, {
         a: { switch: 'sw1', port: 'p1' },
         b: { switch: 'sw1', port: 'p2' },
       }),
-    ).toBe('M 509 409 C 509 433, 536 433, 536 409')
+    ).toBe('M 509 409 C 509 473, 536 473, 536 409')
+  })
+
+  it('keeps adjacent SFP+ uplinks clickable under a dense 48-port face', () => {
+    // The Unifi 48 Port preset: 24+24 main, 4 SFP+ right; uplink bank height
+    // 22 -> face height 89, bottom at y + 89. p49/p50 anchors sit at
+    // (807.5, 94.5) and (834.5, 94.5) on a switch at (100, 50); their dip
+    // must reach 139 + 8: bow (147 - 94.5) / 0.75 = 70.
+    const switch_ = switchWith(
+      [row('rj45', 24), row('rj45', 24, 25), row('sfp+', 4, 49, '10G')],
+      100,
+      50,
+    )
+    const setup = { switches: [switch_], connections: [] }
+
+    expect(
+      connectionCurve(setup, {
+        a: { switch: 'sw1', port: 'p49' },
+        b: { switch: 'sw1', port: 'p50' },
+      }),
+    ).toBe('M 807.5 94.5 C 807.5 164.5, 834.5 164.5, 834.5 94.5')
+  })
+
+  it('dips a level cross-switch cable below both overlapping faceplates', () => {
+    const setup = sampleDocument().setup
+    setup.switches[1].x = 160
+    setup.switches[1].y = 360
+
+    // sw2.p1 = (160 + 393 + 13.5, 360 + 49); both 89-high faces (bottom 449)
+    // cover the level span, so the dip must reach 457: bow 64.
+    expect(
+      connectionCurve(setup, {
+        a: { switch: 'sw1', port: 'p1' },
+        b: { switch: 'sw2', port: 'p1' },
+      }),
+    ).toBe('M 509 409 C 509 473, 566.5 473, 566.5 409')
+  })
+
+  it('leaves a level cross-switch cable alone when its dip already clears both faces', () => {
+    const setup = sampleDocument().setup
+    setup.switches[1].y = 360
+
+    // 537.5 apart on the same level: the base span sag already reaches
+    // 409 + 0.75 * 120 = 499, well clear of the 449 faces, so the style stays.
+    expect(
+      connectionCurve(setup, {
+        a: { switch: 'sw1', port: 'p1' },
+        b: { switch: 'sw2', port: 'p1' },
+      }),
+    ).toBe('M 509 409 C 509 529, 1046.5 529, 1046.5 409')
+  })
+
+  it('keeps every adjacent pair on a dense face clear of the chassis', () => {
+    // Unifi 48 Port density: 24+24 main, 4 SFP+ right. Face height 89 (bottom
+    // 50 + 89 = 139); every wired neighbour's deepest point must clear it by 8.
+    const switch_ = switchWith(
+      [row('rj45', 24), row('rj45', 24, 25), row('sfp+', 4, 49, '10G')],
+      100,
+      50,
+    )
+    const setup = { switches: [switch_], connections: [] }
+    const pairs: Array<[number, number]> = []
+    for (let port = 1; port < 24; port++) pairs.push([port, port + 1])
+    for (let port = 25; port < 48; port++) pairs.push([port, port + 1])
+    pairs.push([49, 50], [50, 51], [51, 52], [1, 25], [24, 48], [1, 49], [24, 52])
+
+    for (const [from, to] of pairs) {
+      const d = connectionCurve(setup, {
+        a: { switch: 'sw1', port: `p${from}` },
+        b: { switch: 'sw1', port: `p${to}` },
+      })
+      expect(d, `p${from}-p${to} should be drawn`).toBeDefined()
+      const deepest = deepestPoint(d as string)
+      expect(deepest.y, `p${from}-p${to} deepest point must clear the face`).toBeGreaterThanOrEqual(
+        146.99,
+      )
+      expect(deepest.x, `p${from}-p${to} deepest point stays under its face`).toBeGreaterThan(100)
+      expect(deepest.x, `p${from}-p${to} deepest point stays under its face`).toBeLessThan(980)
+    }
   })
 
   it('draws nothing when a referenced switch or port no longer exists', () => {
