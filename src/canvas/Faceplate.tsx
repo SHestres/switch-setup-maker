@@ -10,6 +10,8 @@ export interface FaceplateProps {
   x: number
   y: number
   selected?: boolean
+  /** Preview only: transparent, no controls and no handlers, so it cannot be wired or selected. */
+  ghost?: boolean
   /** Connected ports as `switch:port` keys, so jacks can show a wired fill. */
   connectedPorts?: ReadonlySet<string>
   onMouseDown?: (event: MouseEvent<HTMLDivElement>) => void
@@ -23,6 +25,7 @@ export function Faceplate({
   x,
   y,
   selected = false,
+  ghost = false,
   connectedPorts,
   onMouseDown,
   onClick,
@@ -33,13 +36,13 @@ export function Faceplate({
 
   return (
     <div
-      className={selected ? 'switch selected' : 'switch'}
-      data-switch={switch_.id}
+      className={ghost ? 'switch ghost' : selected ? 'switch selected' : 'switch'}
+      {...(ghost ? { 'data-draft': true } : { 'data-switch': switch_.id })}
       role="group"
-      aria-label={name}
+      aria-label={ghost ? 'Draft switch' : name}
       style={{ left: x, top: y }}
-      onMouseDown={onMouseDown}
-      onClick={onClick}
+      onMouseDown={ghost ? undefined : onMouseDown}
+      onClick={ghost ? undefined : onClick}
     >
       <div className="sw-tag">
         <b>{name}</b>
@@ -67,6 +70,7 @@ export function Faceplate({
               rows={banks.left}
               switchId={switch_.id}
               switchName={name}
+              ghost={ghost}
               connectedPorts={connectedPorts}
               onPortClick={onPortClick}
             />
@@ -75,6 +79,7 @@ export function Faceplate({
             rows={banks.main}
             switchId={switch_.id}
             switchName={name}
+            ghost={ghost}
             connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
@@ -83,6 +88,7 @@ export function Faceplate({
               rows={banks.right}
               switchId={switch_.id}
               switchName={name}
+              ghost={ghost}
               connectedPorts={connectedPorts}
               onPortClick={onPortClick}
             />
@@ -105,11 +111,12 @@ interface BankProps {
   rows: readonly Row[]
   switchId: string
   switchName: string
+  ghost?: boolean
   connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function MainBank({ rows, switchId, switchName, connectedPorts, onPortClick }: BankProps) {
+function MainBank({ rows, switchId, switchName, ghost, connectedPorts, onPortClick }: BankProps) {
   return (
     <div className="bank main">
       {pairRows(rows).map(([top, bottom], index) => (
@@ -119,6 +126,7 @@ function MainBank({ rows, switchId, switchName, connectedPorts, onPortClick }: B
             row={top}
             switchId={switchId}
             switchName={switchName}
+            ghost={ghost}
             connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
@@ -128,6 +136,7 @@ function MainBank({ rows, switchId, switchName, connectedPorts, onPortClick }: B
                 row={bottom}
                 switchId={switchId}
                 switchName={switchName}
+                ghost={ghost}
                 connectedPorts={connectedPorts}
                 onPortClick={onPortClick}
               />
@@ -140,7 +149,7 @@ function MainBank({ rows, switchId, switchName, connectedPorts, onPortClick }: B
   )
 }
 
-function UplinkBank({ rows, switchId, switchName, connectedPorts, onPortClick }: BankProps) {
+function UplinkBank({ rows, switchId, switchName, ghost, connectedPorts, onPortClick }: BankProps) {
   return (
     <div className="bank uplink">
       <span className="bank-label">{bankLabel(rows)}</span>
@@ -151,6 +160,7 @@ function UplinkBank({ rows, switchId, switchName, connectedPorts, onPortClick }:
             row={row}
             switchId={switchId}
             switchName={switchName}
+            ghost={ghost}
             connectedPorts={connectedPorts}
             onPortClick={onPortClick}
           />
@@ -164,11 +174,12 @@ interface PortRowProps {
   row: Row
   switchId: string
   switchName: string
+  ghost?: boolean
   connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function PortRow({ row, switchId, switchName, connectedPorts, onPortClick }: PortRowProps) {
+function PortRow({ row, switchId, switchName, ghost, connectedPorts, onPortClick }: PortRowProps) {
   return (
     <div className="row">
       {row.ports.map((port) => (
@@ -177,6 +188,7 @@ function PortRow({ row, switchId, switchName, connectedPorts, onPortClick }: Por
           port={port}
           switchId={switchId}
           switchName={switchName}
+          ghost={ghost}
           connectedPorts={connectedPorts}
           onPortClick={onPortClick}
         />
@@ -189,13 +201,38 @@ interface PortButtonProps {
   port: Port
   switchId: string
   switchName: string
+  ghost?: boolean
   connectedPorts?: ReadonlySet<string>
   onPortClick?: (ref: PortRef) => void
 }
 
-function PortButton({ port, switchId, switchName, connectedPorts, onPortClick }: PortButtonProps) {
+function PortButton({
+  port,
+  switchId,
+  switchName,
+  ghost,
+  connectedPorts,
+  onPortClick,
+}: PortButtonProps) {
   const kind = port.kind === 'sfp+' ? 'sfpp' : port.kind
   const isCage = port.kind !== 'rj45'
+  const content = (
+    <>
+      {isCage && <span className="cage-num">{port.label}</span>}
+      <span className="led" />
+      <span className="jack" />
+      {isCage && <span className="latch" />}
+    </>
+  )
+
+  if (ghost) {
+    return (
+      <span className={`port kind-${kind}`} data-port={port.id} aria-hidden="true">
+        {content}
+      </span>
+    )
+  }
+
   const connected = connectedPorts?.has(`${switchId}:${port.id}`) ?? false
   return (
     <button
@@ -208,10 +245,7 @@ function PortButton({ port, switchId, switchName, connectedPorts, onPortClick }:
         onPortClick?.({ switch: switchId, port: port.id })
       }}
     >
-      {isCage && <span className="cage-num">{port.label}</span>}
-      <span className="led" />
-      <span className="jack" />
-      {isCage && <span className="latch" />}
+      {content}
     </button>
   )
 }

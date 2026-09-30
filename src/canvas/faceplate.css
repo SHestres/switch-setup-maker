@@ -161,6 +161,16 @@
   outline-offset: 2px;
 }
 
+/* A draft preview: see-through and inert; the panel owns its only controls. */
+.canvas-root .switch.ghost {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.canvas-root .switch.ghost .face {
+  border-style: dashed;
+}
+
 .canvas-root .chrome {
   display: flex;
   flex: 0 0 auto;
