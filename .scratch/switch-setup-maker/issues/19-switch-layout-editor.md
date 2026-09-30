@@ -1,7 +1,7 @@
 # 19: Switch layout editor
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 17
 
 ## What to build
