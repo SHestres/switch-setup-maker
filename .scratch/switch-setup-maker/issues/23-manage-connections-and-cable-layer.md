@@ -1,7 +1,7 @@
 # 23: Manage connections & cable layer
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 22, 18
 
 ## What to build
