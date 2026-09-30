@@ -1,7 +1,7 @@
-import { resetSetup } from '@/model/document'
+import { Canvas } from '@/canvas/Canvas'
+import { moveSwitch, resetSetup, setViewport } from '@/model/document'
 import { useDocument } from '@/model/useDocument'
 import { AppBar } from '@/ui/AppBar'
-import { SetupSummary } from '@/ui/SetupSummary'
 
 export default function App() {
   const { document, setDocument } = useDocument()
@@ -14,7 +14,13 @@ export default function App() {
         onNewSetup={() => setDocument((current) => resetSetup(current))}
       />
       <main className="relative flex-1 overflow-hidden">
-        <SetupSummary setup={document.setup} />
+        <Canvas
+          document={document}
+          onMoveSwitch={(switchId, position) =>
+            setDocument((current) => moveSwitch(current, switchId, position))
+          }
+          onViewportChange={(viewport) => setDocument((current) => setViewport(current, viewport))}
+        />
       </main>
     </div>
   )
