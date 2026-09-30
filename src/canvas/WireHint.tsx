@@ -2,6 +2,7 @@ import { findSwitch } from '@/model/document'
 import type { Setup } from '@/model/types'
 
 import { portAnchor } from './geometry'
+import { portKey } from './portRef'
 import type { WireHintState } from './wiring'
 
 export interface WireHintProps {
@@ -22,7 +23,7 @@ export function WireHint({ setup, hint }: WireHintProps) {
     <div
       role="status"
       className="wire-hint"
-      data-hint-port={`${hint.port.switch}:${hint.port.port}`}
+      data-hint-port={portKey(hint.port)}
       style={{ left: anchor.x, top: anchor.y }}
     >
       {hint.message}

@@ -1,6 +1,7 @@
 import type { Setup } from '@/model/types'
 
 import { pointForPort, wireCurve } from './geometry'
+import { portKey } from './portRef'
 import type { PendingWire as PendingWireState } from './wiring'
 
 export interface PendingWireProps {
@@ -31,7 +32,7 @@ export function PendingWire({ setup, pending = null }: PendingWireProps) {
     >
       <path
         className="pending"
-        data-pending={`${pending.from.switch}:${pending.from.port}`}
+        data-pending={portKey(pending.from)}
         d={wireCurve(from, pending.to ?? from)}
       />
     </svg>

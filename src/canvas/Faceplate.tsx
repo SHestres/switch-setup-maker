@@ -1,9 +1,11 @@
 import { Fragment } from 'react'
 import type { MouseEvent } from 'react'
 
+import { switchLabel } from '@/model/document'
 import type { Port, PortRef, Row, Switch } from '@/model/types'
 
 import { bankLabel, portAriaLabel, splitBanks } from './faceplateLayout'
+import { portKey } from './portRef'
 
 export interface FaceplateProps {
   switch_: Switch
@@ -35,7 +37,7 @@ export function Faceplate({
   onPortClick,
 }: FaceplateProps) {
   const banks = splitBanks(switch_.layout.rows)
-  const name = switch_.name || switch_.model || switch_.id
+  const name = switchLabel(switch_)
 
   return (
     <div
@@ -270,7 +272,7 @@ function PortButton({
     )
   }
 
-  const connected = connectedPorts?.has(`${switchId}:${port.id}`) ?? false
+  const connected = connectedPorts?.has(portKey({ switch: switchId, port: port.id })) ?? false
   const pending = pendingPortId === port.id
   return (
     <button

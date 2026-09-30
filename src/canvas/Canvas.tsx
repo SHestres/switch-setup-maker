@@ -12,6 +12,7 @@ import { WireHint } from './WireHint'
 import { WireLayer } from './WireLayer'
 import type { Point } from './geometry'
 import type { Size } from './placement'
+import { portKey } from './portRef'
 import type { WireHintState } from './wiring'
 import './faceplate.css'
 
@@ -51,10 +52,6 @@ export interface CanvasProps {
 
 function sameViewport(a: Viewport, b: Viewport): boolean {
   return a.x === b.x && a.y === b.y && a.zoom === b.zoom
-}
-
-function portKey(ref: PortRef): string {
-  return `${ref.switch}:${ref.port}`
 }
 
 /** Every connected port in the setup, as `switch:port` keys, in one pass. */
