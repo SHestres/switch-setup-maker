@@ -38,6 +38,17 @@ const MIN_SAG = 24
 const MAX_BOW = 120
 /** Sag grows with horizontal span, as a share of it. */
 const SAG_RATIO = 0.5
+/**
+ * A cubic whose two control points sit equally below level anchors reaches its
+ * lowest point this share of the control bow below them (at t = 0.5).
+ */
+const SAG_LOWEST_SHARE = 0.75
+/**
+ * Visible clearance between a sagging cable's lowest point and the bottom of
+ * the faceplate it passes under, so the cable always has an exposed, clickable
+ * run while "Cables behind". Clearance wins over MAX_BOW for tall faceplates.
+ */
+const SAG_CLEARANCE = 8
 
 interface FaceplateBank {
   rows: readonly Row[]
@@ -159,8 +170,56 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-/** The two control points of the cable between `a` and `b`. */
-function wireControls(a: Point, b: Point): { c1: Point; c2: Point } {
+/** The rendered faceplate height, mirroring the CSS box (border-box, 89px minimum). */
+function faceHeight(switch_: Switch): number {
+  const { main, left, right } = splitBanks(switch_.layout.rows)
+  const contentHeight = Math.max(
+    FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y,
+    mainBankHeight(main),
+    uplinkBankHeight(left),
+    uplinkBankHeight(right),
+  )
+  return contentHeight + 2 * FACE_BORDER + 2 * FACE_PADDING_Y
+}
+
+/** The style's base sag for a level pair: grows with span, within [MIN_SAG, MAX_BOW]. */
+function baseSag(a: Point, b: Point): number {
+  return Math.min(Math.max(Math.abs(b.x - a.x) * SAG_RATIO, MIN_SAG), MAX_BOW)
+}
+
+/**
+ * The smallest sag whose cable dips clear of every faceplate under its lowest
+ * point, by SAG_CLEARANCE. Only meaningful for level pairs (the sag branch):
+ * a sloped cable's lowest point is an endpoint inside its own faceplate, and
+ * vertical exits are preserved. Raising the dip can bring it under another
+ * faceplate, so the scan repeats to a fixed point (bounded by the switch count).
+ */
+function clearanceSag(setup: Setup, a: Point, b: Point): number {
+  const midX = (a.x + b.x) / 2
+  const baseY = (a.y + b.y) / 2
+  let lowest = baseY + baseSag(a, b) * SAG_LOWEST_SHARE
+  for (let pass = 0; pass <= setup.switches.length; pass++) {
+    let raised = false
+    for (const switch_ of setup.switches) {
+      if (midX < switch_.x || midX > switch_.x + RACK_WIDTH) continue
+      const bottom = switch_.y + faceHeight(switch_)
+      if (lowest >= switch_.y && lowest < bottom + SAG_CLEARANCE) {
+        lowest = bottom + SAG_CLEARANCE
+        raised = true
+      }
+    }
+    if (!raised) break
+  }
+  return (lowest - baseY) / SAG_LOWEST_SHARE
+}
+
+/** The extra sag a settled cable needs so it stays clickable in behind mode. */
+function faceplateClearance(setup: Setup, a: Point, b: Point): number {
+  return Math.abs(b.y - a.y) <= LEVEL_GAP ? clearanceSag(setup, a, b) : 0
+}
+
+/** The two control points of the cable between `a` and `b`, at least `minSag` deep. */
+function wireControls(a: Point, b: Point, minSag = 0): { c1: Point; c2: Point } {
   const dy = b.y - a.y
   let fromY: number
   let toY: number
@@ -170,7 +229,7 @@ function wireControls(a: Point, b: Point): { c1: Point; c2: Point } {
     fromY = a.y + sign * bow
     toY = b.y - sign * bow
   } else {
-    const bow = Math.min(Math.max(Math.abs(b.x - a.x) * SAG_RATIO, MIN_SAG), MAX_BOW)
+    const bow = Math.max(baseSag(a, b), minSag)
     fromY = a.y + bow
     toY = b.y + bow
   }
@@ -181,16 +240,16 @@ function wireControls(a: Point, b: Point): { c1: Point; c2: Point } {
  * SVG path from one port anchor to another. Cables leave Ports vertically: the
  * first control point sits above/below the start, the second below/above the
  * end. Roughly level Ports (same row, or within LEVEL_GAP) both exit downwards
- * and the cable hangs in a sag.
+ * and the cable hangs in a sag at least `minSag` deep.
  */
-export function wireCurve(a: Point, b: Point): string {
-  const { c1, c2 } = wireControls(a, b)
+export function wireCurve(a: Point, b: Point, minSag = 0): string {
+  const { c1, c2 } = wireControls(a, b, minSag)
   return `M ${round2(a.x)} ${round2(a.y)} C ${round2(c1.x)} ${round2(c1.y)}, ${round2(c2.x)} ${round2(c2.y)}, ${round2(b.x)} ${round2(b.y)}`
 }
 
 /** A point on the cable's cubic curve, at `t` 0 to 1. */
-export function wirePoint(a: Point, b: Point, t: number): Point {
-  const { c1, c2 } = wireControls(a, b)
+export function wirePoint(a: Point, b: Point, t: number, minSag = 0): Point {
+  const { c1, c2 } = wireControls(a, b, minSag)
   const inv = 1 - t
   const wa = inv * inv * inv
   const wc1 = 3 * inv * inv * t
@@ -207,7 +266,7 @@ export function connectionCurve(setup: Setup, connection: Connection): string | 
   const a = pointForPort(setup, connection.a)
   const b = pointForPort(setup, connection.b)
   if (!a || !b) return undefined
-  return wireCurve(a, b)
+  return wireCurve(a, b, faceplateClearance(setup, a, b))
 }
 
 /** The curve midpoint of one Connection, where selection affordances anchor. */
@@ -215,7 +274,7 @@ export function connectionMidpoint(setup: Setup, connection: Connection): Point 
   const a = pointForPort(setup, connection.a)
   const b = pointForPort(setup, connection.b)
   if (!a || !b) return undefined
-  return wirePoint(a, b, 0.5)
+  return wirePoint(a, b, 0.5, faceplateClearance(setup, a, b))
 }
 
 /** Where a Port ref's anchor sits in canvas coordinates, when it exists. */

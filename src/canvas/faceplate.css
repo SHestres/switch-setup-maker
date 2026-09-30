@@ -26,9 +26,11 @@
   --led-socket: none;
   --accent: #3b82f6;
   --text: #3b4654;
-  --muted: #93a0af;
+  /* Micro print (.bank-label/.cage-num) needs >= 4.5:1 on the white face. */
+  --muted: #64748b;
   --num: #64748b;
-  --tag: #64748b;
+  /* The switch tag sits on the canvas background, not the face. */
+  --tag: #5b6b7f;
   --wire: #7c8899;
   --wire-hover: #ef4444;
   --wire-width: 2.5;
