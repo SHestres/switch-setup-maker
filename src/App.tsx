@@ -14,12 +14,13 @@ import {
   setCableLayer,
   setTheme,
   setViewport,
+  switchLabel,
 } from '@/model/document'
 import { applyLayoutEdit, countSeveredConnections, planLayoutEdit } from '@/model/layoutEdit'
 import type { LayoutEdit } from '@/model/layoutEdit'
 import { switchFromPreset } from '@/model/presets'
 import type { LayoutPreset } from '@/model/presets'
-import type { Connection, PortRef, Switch } from '@/model/types'
+import type { Connection, PortRef } from '@/model/types'
 import { useDocument } from '@/model/useDocument'
 import { AppBar } from '@/ui/AppBar'
 import { Dialog } from '@/ui/Dialog'
@@ -52,10 +53,6 @@ function inspectorFor(exit: InspectorExit): InspectorState {
   if (exit === 'close') return null
   if (exit === 'gallery') return { mode: 'gallery' }
   return { mode: 'editor', switchId: exit.switchId }
-}
-
-function switchLabel(switch_: Switch): string {
-  return switch_.name || switch_.model || switch_.id
 }
 
 function connectionCount(count: number): string {

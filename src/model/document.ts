@@ -41,6 +41,11 @@ export function findPort(setup: Setup, ref: PortRef): Port | undefined {
     .find((port) => port.id === ref.port)
 }
 
+/** The label a switch is shown under: its name, else its model, else its id. */
+export function switchLabel(switch_: Switch): string {
+  return switch_.name || switch_.model || switch_.id
+}
+
 /** One past the highest `sw<n>` suffix in use. */
 export function nextSwitchId(switches: Iterable<Switch>): string {
   let highest = 0

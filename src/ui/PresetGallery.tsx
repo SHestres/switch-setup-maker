@@ -8,8 +8,8 @@ import { secondaryButton } from './buttonStyles'
 export interface PresetGalleryProps {
   /** A hardware chip: creates and selects the switch in one click. */
   onPick: (preset: LayoutPreset) => void
-  /** `Start blank` starts the draft flow (ticket 20); disabled until wired. */
-  onStartBlank?: () => void
+  /** `Start blank` starts the draft flow (ticket 20). */
+  onStartBlank: () => void
 }
 
 export function PresetGallery({ onPick, onStartBlank }: PresetGalleryProps) {
@@ -39,7 +39,6 @@ export function PresetGallery({ onPick, onStartBlank }: PresetGalleryProps) {
         <button
           type="button"
           className={`${secondaryButton} w-full justify-start text-left`}
-          disabled={!onStartBlank}
           onClick={onStartBlank}
         >
           Start blank

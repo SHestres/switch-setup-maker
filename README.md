@@ -3,9 +3,10 @@
 A local-first web app for modelling network switch setups: switches rendered as faceplates on a
 canvas, wired port-to-port. Static build, no backend — data stays in the browser.
 
-**Status**: MVP in progress, ticket by ticket; the plan lives in the
-[wayfinder map](.scratch/switch-setup-maker/map.md). The domain model, autosave/restore and JSON
-import/export have landed — the switch builder and canvas are next.
+**Status**: the MVP is built — canvas faceplates, a preset gallery and blank-switch draft builder,
+click-to-wire connections, themes and cable layers, autosave and JSON import/export. Post-MVP work
+is queued in the [wayfinder map](.scratch/switch-setup-maker/map.md); to run what exists, see
+[Self-hosting](#self-hosting).
 
 ## Requirements
 

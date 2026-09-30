@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { CASCADE_WRAP, DEFAULT_CANVAS_SIZE, placeNewSwitch, visibleCentre } from './placement'
+import { FACE_HEIGHT, RACK_WIDTH } from './constants'
+import { DEFAULT_CANVAS_SIZE, placeNewSwitch, visibleCentre } from './placement'
 
 describe('visibleCentre', () => {
   it('maps the container centre through the viewport transform', () => {
@@ -37,11 +38,44 @@ describe('placeNewSwitch', () => {
     expect(placeNewSwitch(viewport, container, 2)).toEqual({ x: 108, y: 303.5 })
   })
 
-  it('wraps the cascade so it stays small', () => {
+  it('never wraps the cascade back onto an earlier switch', () => {
     const viewport = { x: 0, y: 0, zoom: 1 }
     const container = { width: 1000, height: 600 }
-    expect(placeNewSwitch(viewport, container, CASCADE_WRAP)).toEqual(
+    const positions = Array.from({ length: 12 }, (_, index) =>
+      placeNewSwitch(viewport, container, index),
+    )
+    const keys = positions.map(({ x, y }) => `${x},${y}`)
+    expect(new Set(keys).size).toBe(keys.length)
+    expect(placeNewSwitch(viewport, container, 6)).not.toEqual(
       placeNewSwitch(viewport, container, 0),
     )
+  })
+
+  it('keeps every cascaded switch inside the visible viewport', () => {
+    const viewport = { x: 0, y: 0, zoom: 1 }
+    const container = DEFAULT_CANVAS_SIZE
+    for (let index = 0; index < 24; index++) {
+      const { x, y } = placeNewSwitch(viewport, container, index)
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(x + RACK_WIDTH).toBeLessThanOrEqual(container.width)
+      expect(y + FACE_HEIGHT).toBeLessThanOrEqual(container.height)
+    }
+  })
+
+  it('keeps every cascaded switch inside a panned and zoomed viewport', () => {
+    const viewport = { x: -160, y: -90, zoom: 0.5 }
+    const container = { width: 1200, height: 800 }
+    const left = -viewport.x / viewport.zoom
+    const top = -viewport.y / viewport.zoom
+    const right = left + container.width / viewport.zoom
+    const bottom = top + container.height / viewport.zoom
+    for (let index = 0; index < 24; index++) {
+      const { x, y } = placeNewSwitch(viewport, container, index)
+      expect(x).toBeGreaterThanOrEqual(left)
+      expect(y).toBeGreaterThanOrEqual(top)
+      expect(x + RACK_WIDTH).toBeLessThanOrEqual(right)
+      expect(y + FACE_HEIGHT).toBeLessThanOrEqual(bottom)
+    }
   })
 })

@@ -1,7 +1,8 @@
 import { samePair } from '@/model/connections'
-import type { Connection, PortRef, Setup } from '@/model/types'
+import type { Connection, Setup } from '@/model/types'
 
 import { connectionCurve, connectionMidpoint } from './geometry'
+import { portKey } from './portRef'
 
 export interface WireLayerProps {
   setup: Setup
@@ -71,9 +72,5 @@ export function WireLayer({
 }
 
 function connectionKey(connection: Connection): string {
-  return `${refKey(connection.a)}-${refKey(connection.b)}`
-}
-
-function refKey(ref: PortRef): string {
-  return `${ref.switch}:${ref.port}`
+  return `${portKey(connection.a)}-${portKey(connection.b)}`
 }
