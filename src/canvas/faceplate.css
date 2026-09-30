@@ -1,13 +1,15 @@
 /*
  * Canvas and faceplate skin (canvas layer). The default block is the light
- * "diagrammatic" theme; ticket 18 adds [data-theme='dark'] and
- * [data-theme='blueprint'] overrides on top of these variables.
+ * "diagrammatic" theme; [data-theme='dark'] (photoreal) and
+ * [data-theme='blueprint'] override these variables on the same root.
  */
 
 .canvas-root {
   --tile-w: 27px;
   --rack-width: 880px;
   --canvas-bg: #eef1f5;
+  --canvas-grid-image: radial-gradient(circle, #ccd6e0 1px, transparent 1.1px);
+  --canvas-grid-size: 22px 22px;
   --face-bg: #ffffff;
   --face-radius: 8px;
   --face-border: 1px solid #d9dfe7;
@@ -15,16 +17,28 @@
   --jack-bg: #f1f4f8;
   --jack-border: 1px solid #cbd5e1;
   --jack-radius: 3px;
+  --jack-shadow: none;
   --latch-bg: #94a3b8;
   --led-off: #d7dde5;
+  --led-on: #22c55e;
+  --led-glow: 0 0 5px rgba(34, 197, 94, 0.6);
+  --led-socket: none;
   --accent: #3b82f6;
   --text: #3b4654;
   --muted: #93a0af;
   --num: #64748b;
   --tag: #64748b;
+  --wire: #7c8899;
+  --wire-hover: #ef4444;
+  --wire-width: 2.5;
   --ear-bg: #e3e8ee;
   --ear-border: 1px solid #d3dae3;
   --screw-bg: #c1cad5;
+  --screw-shadow: none;
+  --vents-opacity: 0.35;
+  --sfp-bg: #334155;
+  --sfp-border: #243244;
+  --sfp-image: none;
 
   position: relative;
   width: 100%;
@@ -32,8 +46,8 @@
   overflow: hidden;
   cursor: grab;
   background-color: var(--canvas-bg);
-  background-image: radial-gradient(circle, #ccd6e0 1px, transparent 1.1px);
-  background-size: 22px 22px;
+  background-image: var(--canvas-grid-image);
+  background-size: var(--canvas-grid-size);
 }
 
 .canvas-stage {
@@ -89,6 +103,7 @@
   margin-left: -3px;
   border-radius: 50%;
   background: var(--screw-bg);
+  box-shadow: var(--screw-shadow);
 }
 
 .canvas-root .screw.t {
@@ -112,6 +127,11 @@
   border-radius: var(--face-radius);
   background: var(--face-bg);
   box-shadow: var(--face-shadow);
+}
+
+.canvas-root .face,
+.canvas-root .sw-tag {
+  font-family: var(--face-font, inherit);
 }
 
 .canvas-root .switch.selected .face {
@@ -175,7 +195,7 @@
   width: 30px;
   height: 12px;
   background: repeating-linear-gradient(180deg, var(--muted) 0 1px, transparent 1px 4px);
-  opacity: 0.35;
+  opacity: var(--vents-opacity);
 }
 
 .canvas-root .console {
@@ -189,6 +209,7 @@
   border: var(--jack-border);
   border-radius: 2px;
   background: var(--jack-bg);
+  box-shadow: var(--jack-shadow);
 }
 
 .canvas-root .console .c-rj {
@@ -282,7 +303,8 @@
   left: 2px;
   border: var(--jack-border);
   border-radius: var(--jack-radius);
-  background: var(--jack-bg);
+  background-color: var(--jack-bg);
+  box-shadow: var(--jack-shadow);
 }
 
 .canvas-root .port .led {
@@ -293,14 +315,16 @@
   height: 4px;
   border-radius: 50%;
   background: var(--led-off);
+  box-shadow: var(--led-socket);
 }
 
 .canvas-root .port.kind-sfp .jack,
 .canvas-root .port.kind-sfpp .jack {
   top: 2px;
   bottom: 2px;
-  border-color: #243244;
-  background: #334155;
+  border-color: var(--sfp-border);
+  background-color: var(--sfp-bg);
+  background-image: var(--sfp-image);
 }
 
 .canvas-root .port .latch {
@@ -331,4 +355,128 @@
 .canvas-root .port:focus-visible .jack {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/*
+ * Dark "photoreal": metal-gradient bodies and sunken jacks. Per the spec the
+ * canvas keeps the light theme's dot grid, dark-tinted; prototype B has none.
+ */
+.canvas-root[data-theme='dark'] {
+  --canvas-bg: #101418;
+  --canvas-grid-image: radial-gradient(circle, #2b333e 1px, transparent 1.1px);
+  --face-bg: linear-gradient(180deg, #41474e 0%, #2c3137 55%, #22262b 100%);
+  --face-radius: 3px;
+  --face-border: 1px solid #0a0c0e;
+  --face-shadow: 0 12px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --jack-bg: #0a0c0e;
+  --jack-border: 1px solid #181c1f;
+  --jack-radius: 2px;
+  --jack-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --latch-bg: #8b96a3;
+  --led-off: #24292e;
+  --led-on: #3ee06a;
+  --led-glow: 0 0 7px rgba(62, 224, 106, 0.95);
+  --led-socket: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+  --accent: #f59e0b;
+  --text: #cdd5de;
+  --muted: #8b96a3;
+  --num: #aab5c1;
+  --tag: #7d8a99;
+  --wire: #8b9daf;
+  --wire-hover: #ef4444;
+  --wire-width: 3.5;
+  --ear-bg: linear-gradient(180deg, #4b525a, #33383e);
+  --ear-border: 1px solid #14171a;
+  --screw-bg: radial-gradient(circle at 35% 30%, #9aa4ad, #3c4249 65%);
+  --screw-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  --vents-opacity: 0.5;
+  --sfp-bg: #050607;
+  --sfp-border: #6d7783;
+  --sfp-image: linear-gradient(180deg, #050607, #101316);
+}
+
+.canvas-root[data-theme='dark'] .port.kind-rj45 .jack {
+  border-bottom-color: #2c3238;
+}
+
+.canvas-root[data-theme='dark'] .model {
+  font-size: 7.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.canvas-root[data-theme='dark'] .bank-label {
+  font-size: 6px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.canvas-root[data-theme='dark'] .num {
+  font-size: 7.5px;
+  font-weight: 600;
+}
+
+.canvas-root[data-theme='dark'] .sw-tag {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * Blueprint: technical drawing on blue with a 26px line grid, monospace
+ * labels and outlined, hatched uplink cages. The always-above cable layer is
+ * ticket 23's rule; the theme only supplies the wire tokens here.
+ */
+.canvas-root[data-theme='blueprint'] {
+  --canvas-bg: #0d2b4d;
+  --canvas-grid-image:
+    linear-gradient(rgba(159, 208, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(159, 208, 255, 0.09) 1px, transparent 1px);
+  --canvas-grid-size: 26px 26px;
+  --face-bg: rgba(255, 255, 255, 0.025);
+  --face-radius: 2px;
+  --face-border: 1.5px solid #bfe0ff;
+  --face-shadow: none;
+  --face-font: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --jack-bg: rgba(4, 18, 34, 0.35);
+  --jack-border: 1px solid #8ec6f5;
+  --jack-radius: 1px;
+  --jack-shadow: none;
+  --latch-bg: #7dd3fc;
+  --led-off: rgba(255, 255, 255, 0.1);
+  --led-on: #7dd3fc;
+  --led-glow: 0 0 6px rgba(125, 211, 252, 0.85);
+  --led-socket: none;
+  --accent: #facc15;
+  --text: #d7ecff;
+  --muted: #8db8dd;
+  --num: #a9cdec;
+  --tag: #8db8dd;
+  --wire: #7dd3fc;
+  --wire-hover: #facc15;
+  --wire-width: 2;
+  --ear-bg: rgba(255, 255, 255, 0.03);
+  --ear-border: 1px solid #8ec6f5;
+  --screw-bg: transparent;
+  --screw-shadow: inset 0 0 0 1px #8ec6f5;
+  --vents-opacity: 0.3;
+  --sfp-bg: rgba(4, 18, 34, 0.35);
+  --sfp-border: #8ec6f5;
+  --sfp-image: repeating-linear-gradient(
+    45deg,
+    rgba(142, 198, 245, 0.35) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+.canvas-root[data-theme='blueprint'] .screw {
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+}
+
+.canvas-root[data-theme='blueprint'] .cages .port .latch {
+  height: 3px;
+  border: 1px solid #7dd3fc;
+  border-top: 0;
+  background: transparent;
 }

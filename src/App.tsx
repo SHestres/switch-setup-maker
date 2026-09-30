@@ -1,5 +1,5 @@
 import { Canvas } from '@/canvas/Canvas'
-import { moveSwitch, resetSetup, setViewport } from '@/model/document'
+import { moveSwitch, resetSetup, setTheme, setViewport } from '@/model/document'
 import { useDocument } from '@/model/useDocument'
 import { AppBar } from '@/ui/AppBar'
 
@@ -12,6 +12,7 @@ export default function App() {
         document={document}
         onReplace={(next) => setDocument(next)}
         onNewSetup={() => setDocument((current) => resetSetup(current))}
+        onThemeChange={(theme) => setDocument((current) => setTheme(current, theme))}
       />
       <main className="relative flex-1 overflow-hidden">
         <Canvas
