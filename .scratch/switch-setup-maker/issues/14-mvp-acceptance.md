@@ -1,7 +1,7 @@
 # MVP acceptance pass
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 10, 12, 13
 
 ## Question
@@ -13,3 +13,7 @@ Done when the MVP demo passes end-to-end and the map's MVP phase can be declared
 ## Answer
 
 <!-- filled on resolution -->
+
+## Comments
+
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md)'s implementation tickets. Replaced by [25 — MVP acceptance pass](25-mvp-acceptance.md).

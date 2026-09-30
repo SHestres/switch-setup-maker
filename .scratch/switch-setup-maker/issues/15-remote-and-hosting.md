@@ -1,7 +1,7 @@
 # Create the remote & publish the app
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 13, 14
 
 ## Question
@@ -18,3 +18,7 @@ Done when the public URL serves the app and a push to main updates it.
 ## Answer
 
 <!-- filled on resolution -->
+
+## Comments
+
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md). Publishing is dropped from this work queue for now: the user will test locally and deploy the MVP on their own server. No replacement ticket — the hosted-home work can be re-ticketed when it is picked up.

@@ -1,7 +1,7 @@
 # Draw & edit port-to-port connections
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 09, 11
 
 ## Question
@@ -26,3 +26,4 @@ Done when two switches can be wired port-to-port, the pair survives a refresh, a
   - Ports are wiring gestures only; switch selection comes from body clicks, so connection clicks never open the inspector.
   - Draft switches are non-interactable, so ports on a pending draft can't be wired or selected.
 - 2026-09-30 — **Model layer landed** ([09](09-model-persistence.md)). `src/model/connections.ts` has the rules: `connect(setup, a, b)` returns `{ ok: true, setup }` or `{ ok: false, problem }`, and `problem.message` is ready for the transient hint ("Port 24 is already connected."), with `problem.port` pointing at the offending port. `disconnect`, `removeSwitch` and `removePorts` purge as 05 requires; `isPortConnected` answers the styling question.
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md)'s implementation tickets. Replaced by [21 — Render cables from the model](21-render-cables.md), [22 — Wire ports by clicking](22-wire-ports.md) and [23 — Manage connections & cable layer](23-manage-connections-and-cable-layer.md).

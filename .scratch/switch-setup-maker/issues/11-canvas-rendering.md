@@ -1,7 +1,7 @@
 # Render the canvas: faceplates, drag, pan/zoom
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 04, 09
 
 ## Question
@@ -27,3 +27,4 @@ Done when several switches render at readable density and can be dragged and fou
   - New switches land at the visible centre with a slight diagonal cascade; the first-run empty canvas shows the centred CTA card until the first switch exists.
   - The canvas hosts the overlay inspector without resizing or re-fitting, and renders the blank-mode **draft switch** — transparent, non-interactable, live-updated by the builder's edits.
 - 2026-09-30 — **Model layer landed** ([09](09-model-persistence.md)). Read switches from `useDocument()`'s `document.setup.switches` (already restored + autosaved); `findSwitch`/`findPort`/`isPortConnected` are exported from `src/model`. `document.ui` carries `theme` (light/dark/blueprint), `cableLayer` (behind/above) and `viewport`. `SetupSummary` in `src/ui` is the throwaway stand-in this ticket replaces.
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md)'s implementation tickets. Replaced by [16 — Canvas, faceplate & navigation](16-canvas-faceplate-navigation.md), [18 — Themes](18-themes.md) and [20 — Draft switch builder](20-draft-switch-builder.md).

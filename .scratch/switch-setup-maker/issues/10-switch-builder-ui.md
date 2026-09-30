@@ -1,7 +1,7 @@
 # Build the switch builder UI
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 06, 09
 
 ## Question
@@ -22,3 +22,4 @@ Done when a user can create a 24×1G + 4×SFP+ switch from a preset, hand-config
   - Builder fields: name/model (optional), rows (append/remove; count 1–48; kind RJ45/SFP/SFP+; speed 100M–10G), numbering preset (three generated conventions), per-row continue/start-over on rows after the first (SFP-family rows default to start over). No row reorder, no label editing in v1.
   - Delete switch and port-severing structural edits use a confirm dialog naming affected connections; inline validation keeps `Add switch` disabled.
 - 2026-09-30 — **Model layer landed** ([09](09-model-persistence.md)). Build against `src/model/`: `materialiseRows(preset, RowSpec[])` turns the draft's rows into ports with `p1…` ids and generated labels; `relabelRows(layout)` regenerates labels after structural edits; `removePortsFromSwitch` / `removePorts(setup, switchId, ids)` sever connections as required; `nextPortId` / `nextSwitchId` mint ids. Rows after the first carry the per-row `numbering: 'continue' | 'start-over'` from 06 (absent = continue) — set it when materialising. `useDocument()` already restores + autosaves. The preset gallery data from 06's table and the whole draft-switch flow are still this ticket's to build.
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md)'s implementation tickets, cut after this ticket was written. Replaced by [17 — Add flow & selection](17-add-flow-and-selection.md), [19 — Switch layout editor](19-switch-layout-editor.md) and [20 — Draft switch builder](20-draft-switch-builder.md).

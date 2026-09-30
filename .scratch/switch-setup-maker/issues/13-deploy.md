@@ -1,7 +1,7 @@
 # Stand up the self-host path
 
 Type: task
-Status: open
+Status: superseded
 Blocked by: 07, 08
 
 ## Question
@@ -17,3 +17,7 @@ Done when a clean checkout can be built and served locally per the docs — both
 ## Answer
 
 <!-- filled on resolution -->
+
+## Comments
+
+- 2026-09-30 — **Superseded** by [spec.md](../spec.md)'s implementation tickets. Replaced by [24 — Self-host path](24-self-host-path.md).
