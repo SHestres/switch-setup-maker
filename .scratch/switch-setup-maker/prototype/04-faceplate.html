@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — switch faceplate &amp; canvas feel (ticket 04)</title>
+<!--
+  PROTOTYPE (throwaway) — wayfinder ticket 04 "Prototype the switch faceplate & canvas feel".
+  Question: what should a rendered switch look & feel like, and does it hold up at
+  48-port density — readability, click targets, room for cables to land?
+
+  Not production code: no tests, no persistence, hardcoded sample data.
+  Ticket: .scratch/switch-setup-maker/issues/04-faceplate-prototype.md
+  Conventions from research/02-faceplate-conventions.md.
+
+  Three style directions, switchable via the bottom bar, ←/→ keys, or ?style=a|b|c.
+  Four switch examples:
+    SW-A  24×1G + 2×SFP    USW-24 conventions (odd/even rows, independent SFP numbering)
+    SW-B  48×1G + 4×SFP+   C9200L conventions (odd/even, uplinks 49–52)  ← density stress test
+    SW-C  24×1G + 4×SFP+   Aruba 2930F conventions (cages left, number band with ▲/▽)
+    SW-D  12×1G + 2×SFP    Juniper conventions (0-based, even top / odd bottom)
+
+  Controls: drag a switch, wheel = zoom, drag empty canvas = pan,
+  click port → port to wire, click a cable to cut it, Esc cancels a pending port.
+-->
+<style>
+/* ================= base ================= */
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#0b0e12}
+#viewport{position:fixed;inset:0;overflow:hidden;cursor:grab;background:var(--canvas-bg);background-attachment:fixed}
+#viewport.panning{cursor:grabbing}
+#stage{position:absolute;left:0;top:0;width:1px;height:1px;transform-origin:0 0}
+#wires{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.switch{position:absolute;width:max-content;user-select:none;-webkit-user-select:none}
+.sw-tag{position:absolute;top:-17px;left:3px;font-size:10px;letter-spacing:.02em;color:var(--tag);white-space:nowrap}
+.sw-tag b{font-weight:650}
+
+/* ================= face structure ================= */
+.face{position:relative;display:flex;align-items:stretch;height:89px;min-width:var(--min-body,0);
+      padding:5px 6px;border-radius:var(--face-radius);background:var(--face-bg);
+      border:var(--face-border);box-shadow:var(--face-shadow)}
+.ears{position:absolute;top:0;bottom:0;width:18px;background:var(--ear-bg);border:var(--ear-border)}
+.ears.left{left:-14px;border-radius:4px 0 0 4px}
+.ears.right{right:-14px;border-radius:0 4px 4px 0}
+.screw{position:absolute;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--screw-bg);box-shadow:var(--screw-shadow)}
+.screw.t{top:14%}.screw.b{bottom:14%}
+.dimmark{display:none;position:absolute;left:-40px;top:50%;transform:translateY(-50%) rotate(-90deg);
+     transform-origin:center;font-size:8px;color:var(--muted);white-space:nowrap;pointer-events:none}
+.chrome{display:flex;flex-direction:column;justify-content:space-between;flex:0 0 auto}
+.chrome.left{width:34px;align-items:flex-start;padding-right:2px}
+.chrome.right{width:74px;align-items:flex-end;text-align:right}
+.brand{font-size:13px;line-height:12px;color:var(--text)}
+.brand::after{content:attr(data-g)}
+.status{display:flex;flex-direction:column;gap:3px}
+.sled{width:5px;height:5px;border-radius:50%;background:var(--led-off);box-shadow:var(--led-socket)}
+.sled.on{background:var(--led-on);box-shadow:var(--led-glow)}
+.sled.blink{animation:blink 1.6s steps(2,start) infinite}
+.sled.poe.on{background:#f0b429;box-shadow:0 0 5px rgba(240,180,41,.7)}
+.model{font-size:8px;color:var(--text);letter-spacing:.04em;white-space:nowrap}
+.console{display:flex;gap:3px;align-items:center}
+.console i{display:block;border-radius:2px;background:var(--jack-bg);border:var(--jack-border);box-shadow:var(--jack-shadow)}
+.console .c-rj{width:16px;height:12px}
+.console .c-usb{width:9px;height:12px}
+.vents{display:none;width:30px;height:12px;background:repeating-linear-gradient(180deg,var(--muted) 0 1px,transparent 1px 4px);opacity:.5}
+
+/* ================= portfield ================= */
+.portfield{flex:1 1 auto;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 4px;min-width:0}
+.bank{display:flex;flex-direction:column;justify-content:center;position:relative}
+.bank-label{position:absolute;top:-10px;left:-8px;right:-8px;text-align:center;font-size:6.5px;letter-spacing:.06em;color:var(--muted);white-space:nowrap}
+.row{display:flex;height:24px}
+.numrow{display:flex;height:9px}
+.num{width:var(--tile-w);text-align:center;font-size:8px;line-height:9px;color:var(--num);font-variant-numeric:tabular-nums}
+.numband{display:flex;height:10px;align-items:center}
+.nb-col{width:var(--tile-w);display:flex;justify-content:center;align-items:center;gap:2px}
+.nb-num{font-size:7.5px;color:var(--num);font-variant-numeric:tabular-nums;display:inline-flex;align-items:center}
+.nb-num i{font-style:normal;font-size:5px;margin-left:1px;opacity:.85}
+
+/* ================= ports & cages ================= */
+.port{position:relative;width:var(--tile-w);height:24px;border:0;padding:0;background:transparent;cursor:pointer;font:inherit;color:inherit}
+.port .jack{position:absolute;left:2px;right:2px;top:4px;bottom:2px;border-radius:var(--jack-radius,2px);
+            background:var(--jack-bg);border:var(--jack-border);box-shadow:var(--jack-shadow,none)}
+.port .led{position:absolute;left:3px;top:1px;width:4px;height:4px;border-radius:50%;
+           background:var(--led-off);box-shadow:var(--led-socket);transition:background .12s}
+.port.connected .led{background:var(--led-on);box-shadow:var(--led-glow)}
+.port.connected:hover .led{animation:blink .45s steps(2,start) infinite}
+.port.pending .jack{outline:2px solid var(--accent);outline-offset:1px}
+.port.pending{animation:pulse .9s ease-in-out infinite}
+.port:hover .jack{border-color:var(--accent)}
+.port:focus-visible .jack{outline:2px solid var(--accent);outline-offset:1px}
+.port.kind-sfp .jack,.port.kind-sfpp .jack{top:2px;bottom:2px}
+.port.kind-sfp .latch,.port.kind-sfpp .latch{display:none;position:absolute;left:50%;bottom:3px;width:8px;height:2px;
+     margin-left:-4px;border-radius:1px;background:var(--latch-bg)}
+.cage-num{position:absolute;right:2px;top:0;font-size:6px;line-height:8px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cages{display:flex;justify-content:center}
+.cages.layout-row{gap:2px}
+.cages.layout-stack{flex-direction:column;gap:4px}
+.cages.layout-block2x2{display:grid;grid-template-columns:auto auto;gap:4px 3px}
+.cages .port{height:22px}
+.bank.uplink{padding:0 2px}
+
+/* ================= wires ================= */
+#wires g.wire{pointer-events:none}
+#wires .wire-hit{stroke:transparent;stroke-width:16;fill:none;pointer-events:stroke;cursor:pointer}
+#wires .wire-visible{fill:none;stroke:var(--wire);stroke-width:var(--wire-width,2.5);stroke-linecap:round}
+#wires .wire-cap{fill:var(--wire)}
+#wires g.wire:hover .wire-visible{stroke:var(--wire-hover)}
+#wires g.wire:hover .wire-cap{fill:var(--wire-hover)}
+
+@keyframes blink{50%{opacity:.15}}
+@keyframes pulse{50%{opacity:.55}}
+
+/* ================= style A — Diagrammatic ================= */
+body[data-style="a"]{
+  --canvas-bg:#eef1f5;
+  --face-bg:#ffffff;--face-radius:8px;--face-border:1px solid #d9dfe7;
+  --face-shadow:0 1px 2px rgba(16,24,40,.06),0 5px 14px rgba(16,24,40,.05);
+  --jack-bg:#f1f4f8;--jack-border:1px solid #cbd5e1;--jack-radius:3px;--jack-shadow:none;
+  --latch-bg:#94a3b8;
+  --led-off:#d7dde5;--led-on:#22c55e;--led-glow:0 0 5px rgba(34,197,94,.6);--led-socket:none;
+  --accent:#3b82f6;
+  --text:#3b4654;--muted:#93a0af;--num:#64748b;--tag:#64748b;
+  --wire:#7c8899;--wire-hover:#ef4444;--wire-width:2.5;
+  --ear-bg:#e3e8ee;--ear-border:1px solid #d3dae3;--screw-bg:#c1cad5;--screw-shadow:none;
+}
+body[data-style="a"] #viewport{background-image:radial-gradient(circle,#ccd6e0 1px,transparent 1.1px);background-size:22px 22px;background-attachment:fixed}
+body[data-style="a"] .screw{display:none}
+body[data-style="a"] .port.kind-sfp .jack,body[data-style="a"] .port.kind-sfpp .jack{background:#334155;border-color:#243244}
+body[data-style="a"] .port.kind-sfp.connected .jack,body[data-style="a"] .port.kind-sfpp.connected .jack{background:#3c4b60;border-color:#4d5f76}
+body[data-style="a"] .cages .port .latch{display:block}
+
+/* ================= style B — Photoreal ================= */
+body[data-style="b"]{
+  --canvas-bg:#101418;
+  --face-bg:linear-gradient(180deg,#41474e 0%,#2c3137 55%,#22262b 100%);
+  --face-radius:3px;--face-border:1px solid #0a0c0e;
+  --face-shadow:0 12px 26px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);
+  --jack-bg:#0a0c0e;--jack-border:1px solid #181c1f;--jack-radius:2px;
+  --jack-shadow:inset 0 2px 3px rgba(0,0,0,.85),inset 0 -1px 0 rgba(255,255,255,.05);
+  --latch-bg:#8b96a3;
+  --led-off:#24292e;--led-on:#3ee06a;--led-glow:0 0 7px rgba(62,224,106,.95);
+  --led-socket:inset 0 1px 1px rgba(0,0,0,.6);
+  --accent:#f59e0b;
+  --text:#cdd5de;--muted:#8b96a3;--num:#aab5c1;--tag:#7d8a99;
+  --wire:#8b9daf;--wire-hover:#ef4444;--wire-width:3.5;
+  --ear-bg:linear-gradient(180deg,#4b525a,#33383e);--ear-border:1px solid #14171a;
+  --screw-bg:radial-gradient(circle at 35% 30%,#9aa4ad,#3c4249 65%);--screw-shadow:inset 0 0 0 1px rgba(0,0,0,.45);
+}
+body[data-style="b"] .vents{display:block}
+body[data-style="b"] .model{text-transform:uppercase;letter-spacing:.09em;font-size:7.5px}
+body[data-style="b"] .bank-label{text-transform:uppercase;letter-spacing:.1em;font-size:6px}
+body[data-style="b"] .num{font-size:7.5px;font-weight:600}
+body[data-style="b"] .port .jack{border-bottom-color:#2c3238}
+body[data-style="b"] .cages .port .latch{display:block}
+body[data-style="b"] .cages .port .jack{border-color:#6d7783;background:linear-gradient(180deg,#050607,#101316)}
+body[data-style="b"] .sw-tag{font-size:9px;letter-spacing:.05em}
+
+/* ================= style C — Blueprint ================= */
+body[data-style="c"]{
+  --canvas-bg:#0d2b4d;
+  --face-bg:rgba(255,255,255,.025);--face-radius:2px;--face-border:1.5px solid #bfe0ff;
+  --face-shadow:none;
+  --jack-bg:rgba(4,18,34,.35);--jack-border:1px solid #8ec6f5;--jack-radius:1px;--jack-shadow:none;
+  --latch-bg:#7dd3fc;
+  --led-off:rgba(255,255,255,.1);--led-on:#7dd3fc;--led-glow:0 0 6px rgba(125,211,252,.85);--led-socket:none;
+  --accent:#facc15;
+  --text:#d7ecff;--muted:#8db8dd;--num:#a9cdec;--tag:#8db8dd;
+  --wire:#7dd3fc;--wire-hover:#facc15;--wire-width:2;
+  --ear-bg:rgba(255,255,255,.03);--ear-border:1px solid #8ec6f5;--screw-bg:transparent;--screw-shadow:inset 0 0 0 1px #8ec6f5;
+}
+body[data-style="c"] #viewport{background-image:linear-gradient(rgba(159,208,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(159,208,255,.09) 1px,transparent 1px);background-size:26px 26px;background-attachment:fixed}
+body[data-style="c"] .face,body[data-style="c"] .brand,body[data-style="c"] .model,body[data-style="c"] .num,
+body[data-style="c"] .nb-num,body[data-style="c"] .bank-label,body[data-style="c"] .cage-num,body[data-style="c"] .sw-tag{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body[data-style="c"] .dimmark{display:block}
+body[data-style="c"] .cages .port .jack{background-image:repeating-linear-gradient(45deg,rgba(142,198,245,.35) 0 1px,transparent 1px 4px)}
+body[data-style="c"] .cages .port .latch{display:block;background:transparent;border:1px solid #7dd3fc;border-top:0;height:3px}
+body[data-style="c"] .brand::after{content:"[ ]"}
+body[data-style="c"] .screw{width:5px;height:5px;margin-left:-2.5px}
+
+/* ================= hud & switcher ================= */
+#hud{position:fixed;left:12px;top:12px;z-index:50;max-width:360px;padding:9px 11px;border-radius:9px;
+     background:rgba(15,20,28,.93);color:#e5e7eb;font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+     box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#hud .proto{background:#f59e0b;color:#111827;font-weight:700;padding:1px 5px;border-radius:4px}
+#hud .dim{color:#9ca3af}
+#hud b{color:#fff;font-weight:650}
+#hud .pitch-ok{color:#4ade80}#hud .pitch-tight{color:#fbbf24}#hud .pitch-bad{color:#f87171}
+#hud .btns{margin-top:4px;display:flex;gap:5px}
+#hud button{font:inherit;background:#374151;color:#e5e7eb;border:0;border-radius:6px;padding:2px 9px;cursor:pointer}
+#hud button:hover{background:#4b5563}
+#switcher{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:6px;
+          background:rgba(15,20,28,.96);color:#e5e7eb;padding:6px 9px;border-radius:999px;
+          box-shadow:0 8px 24px rgba(0,0,0,.45);font:12px system-ui;white-space:nowrap}
+#switcher button{font:inherit;background:#374151;color:#e5e7eb;border:0;border-radius:7px;min-width:28px;height:26px;cursor:pointer}
+#switcher button:hover{background:#4b5563}
+#switcher button.on{background:#3b82f6;color:#fff}
+#switcher .name{min-width:128px;text-align:center}
+#switcher .dot{width:5px;height:5px;border-radius:50%;background:#4b5563}
+</style>
+</head>
+<body data-style="a">
+
+<div id="viewport">
+  <div id="stage">
+    <svg id="wires" width="1" height="1" overflow="visible" aria-hidden="true"></svg>
+  </div>
+</div>
+
+<div id="hud">
+  <div><span class="proto">PROTOTYPE</span> <span class="dim">ticket 04 · faceplate &amp; canvas feel</span></div>
+  <div>style <b id="hud-style">A · Diagrammatic</b> <span class="dim">(←/→ to flip)</span></div>
+  <div>zoom <b id="hud-zoom">100%</b> · narrowest port pitch <b id="hud-pitch">–</b> <span id="hud-pitch-note" class="pitch-ok"></span></div>
+  <div class="dim">drag a switch · click port → port to wire · click a cable to cut it<br>wheel = zoom · drag empty canvas = pan · Esc = cancel pending</div>
+  <div class="btns">
+    <button id="btn-out" title="zoom out">−</button>
+    <button id="btn-in" title="zoom in">+</button>
+    <button id="btn-100" title="reset zoom to 100%">100%</button>
+    <button id="btn-fit" title="fit all switches">fit all</button>
+  </div>
+</div>
+
+<div id="switcher" role="toolbar" aria-label="prototype style variants">
+  <button id="sw-prev" title="previous style (←)">←</button>
+  <span class="name" id="sw-name">A · Diagrammatic</span>
+  <button id="sw-next" title="next style (→)">→</button>
+  <span class="dot"></span>
+  <button class="s-btn" data-s="a">A</button>
+  <button class="s-btn" data-s="b">B</button>
+  <button class="s-btn" data-s="c">C</button>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   PROTOTYPE spec — hardcoded sample switches (ticket 05 will decide
+   the real model). 1 css px = 0.5 mm at zoom 1.
+   ================================================================ */
+const MM = 2;                       // px per mm at zoom 1
+const mm = v => v * MM;
+
+const SWITCH_SPECS = [
+  { id:"sw-a", name:"SW-A", model:"NSW-24G-2S", x:120, y:130,
+    tagText:"24×1G + 2×SFP — odd/even rows, SFP 1–2 (USW-24 style)",
+    pitch:15, minBody:320, rows:2, perRow:12, numbering:"odd-even", labels:"above-below",
+    uplinks:{ side:"right", layout:"stack", count:2, kind:"sfp", speed:"1G", numbering:"independent", start:1, label:"SFP" } },
+
+  { id:"sw-b", name:"SW-B", model:"NSW-48G-4X", x:120, y:360,
+    tagText:"48×1G + 4×SFP+ — odd/even, uplinks 49–52 (C9200L style) — density test",
+    pitch:13.5, minBody:440, rows:2, perRow:24, numbering:"odd-even", labels:"above-below",
+    uplinks:{ side:"right", layout:"row", count:4, kind:"sfp+", speed:"10G", numbering:"continue", label:"SFP+" } },
+
+  { id:"sw-c", name:"SW-C", model:"NSW-24G-4X", x:1120, y:130,
+    tagText:"24×1G + 4×SFP+ — cages left, number band ▲/▽ (Aruba 2930F style)",
+    pitch:14, minBody:300, rows:2, perRow:12, numbering:"odd-even", labels:"band",
+    uplinks:{ side:"left", layout:"block2x2", count:4, kind:"sfp+", speed:"10G", numbering:"continue", label:"SFP+" } },
+
+  { id:"sw-d", name:"SW-D", model:"NSW-12G-2S", x:1120, y:360,
+    tagText:"12×1G + 2×SFP — 0-based, even top / odd bottom (Juniper style)",
+    pitch:14, minBody:190, rows:2, perRow:6, numbering:"even-odd-0", labels:"above-below",
+    uplinks:{ side:"right", layout:"stack", count:2, kind:"sfp", speed:"1G", numbering:"independent", start:0, label:"SFP" } },
+];
+
+const SEED_WIRES = [
+  ["sw-a:r23", "sw-b:r1"],
+  ["sw-b:u49", "sw-c:u25"],
+  ["sw-a:r24", "sw-b:r48"],
+  ["sw-c:r12", "sw-d:r3"],
+];
+
+const STYLES = [
+  { id:"a", name:"Diagrammatic" },
+  { id:"b", name:"Photoreal" },
+  { id:"c", name:"Blueprint" },
+];
+
+/* ================================================================
+   state
+   ================================================================ */
+const viewport = document.getElementById("viewport");
+const stage    = document.getElementById("stage");
+const svg      = document.getElementById("wires");
+const hudZoom  = document.getElementById("hud-zoom");
+const hudPitch = document.getElementById("hud-pitch");
+const hudNote  = document.getElementById("hud-pitch-note");
+const hudStyle = document.getElementById("hud-style");
+const swName   = document.getElementById("sw-name");
+
+const view = { x: 0, y: 0, k: 1 };
+let styleIdx = 0;
+const wires = [];                  // { id, a:{sw,key}, b:{sw,key} }
+let pending = null;                // { sw, key, el }
+const byId = new Map();            // switch id -> spec (with .el, .ports)
+const portEls = new Map();         // "sw:key" -> { el, jack, def }
+
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ================================================================
+   port layout
+   ================================================================ */
+function makeRj45(spec) {
+  const top = [], bottom = [];
+  for (let c = 0; c < spec.perRow; c++) {
+    let t, b;
+    if (spec.numbering === "even-odd-0")      { t = 2 * c;              b = 1 + 2 * c; }
+    else if (spec.numbering === "sequential") { t = 1 + c;              b = 1 + spec.perRow + c; }
+    else                                      { t = 1 + 2 * c;          b = 2 + 2 * c; }
+    top.push   ({ key:"r"+t, label:String(t), kind:"rj45", speed:"1G", row:0, col:c });
+    bottom.push({ key:"r"+b, label:String(b), kind:"rj45", speed:"1G", row:1, col:c });
+  }
+  return { top, bottom };
+}
+
+function makeUplinks(spec) {
+  const u = spec.uplinks;
+  const first = u.numbering === "continue" ? spec.perRow * 2 + 1 : (u.start ?? 1);
+  const ports = [];
+  for (let i = 0; i < u.count; i++) {
+    ports.push({ key:"u"+(first+i), label:String(first+i), kind:u.kind, speed:u.speed });
+  }
+  return { first, last:first + u.count - 1, ports };
+}
+
+/* ================================================================
+   DOM builders
+   ================================================================ */
+function portEl(spec, p) {
+  const b = el("button", "port kind-" + (p.kind === "sfp+" ? "sfpp" : p.kind));
+  b.dataset.sw = spec.id;
+  b.dataset.port = p.key;
+  b.setAttribute("aria-label", `${p.kind.toUpperCase()} port ${p.label} (${p.speed}) on ${spec.name}`);
+  if (p.kind !== "rj45") b.appendChild(el("span", "cage-num")).textContent = p.label;
+  b.appendChild(el("span", "led"));
+  b.appendChild(el("span", "jack"));
+  if (p.kind !== "rj45") b.appendChild(el("span", "latch"));
+  portEls.set(spec.id + ":" + p.key, { el:b, def:p });
+  return b;
+}
+
+function numRow(ports) {
+  const r = el("div", "numrow");
+  for (const p of ports) {
+    const n = el("span", "num"); n.textContent = p.label; r.appendChild(n);
+  }
+  return r;
+}
+
+function rowOfPorts(spec, ports) {
+  const r = el("div", "row");
+  for (const p of ports) r.appendChild(portEl(spec, p));
+  return r;
+}
+
+function numberBand(spec, rows) {
+  const band = el("div", "numband");
+  for (let c = 0; c < spec.perRow; c++) {
+    const col = el("div", "nb-col");
+    const t = el("span", "nb-num"); t.innerHTML = rows.top[c].label + "<i>▲</i>";
+    const b = el("span", "nb-num"); b.innerHTML = rows.bottom[c].label + "<i>▽</i>";
+    col.append(t, b);
+    band.appendChild(col);
+  }
+  return band;
+}
+
+function mainBank(spec, rows) {
+  const bank = el("div", "bank main");
+  if (spec.labels === "band") {
+    bank.append(rowOfPorts(spec, rows.top), numberBand(spec, rows), rowOfPorts(spec, rows.bottom));
+  } else {
+    bank.append(numRow(rows.top), rowOfPorts(spec, rows.top), rowOfPorts(spec, rows.bottom), numRow(rows.bottom));
+  }
+  return bank;
+}
+
+function uplinkBank(spec, up) {
+  const bank = el("div", "bank uplink");
+  const label = el("div", "bank-label");
+  label.textContent = `${spec.uplinks.label} ${up.first}–${up.last}`;
+  bank.appendChild(label);
+  const cages = el("div", "cages layout-" + spec.uplinks.layout);
+  for (const p of up.ports) cages.appendChild(portEl(spec, p));
+  bank.appendChild(cages);
+  return bank;
+}
+
+function buildSwitch(spec, rows, up) {
+  const root = el("div", "switch");
+  root.dataset.sw = spec.id;
+  root.style.left = spec.x + "px";
+  root.style.top = spec.y + "px";
+  root.style.setProperty("--tile-w", mm(spec.pitch) + "px");
+  root.style.setProperty("--min-body", mm(spec.minBody) + "px");
+
+  const tag = el("div", "sw-tag");
+  tag.innerHTML = `<b>${spec.name}</b> · ${spec.tagText}`;
+  root.appendChild(tag);
+
+  for (const side of ["left", "right"]) {
+    const ear = el("div", "ears " + side);
+    ear.append(Object.assign(el("span", "screw t"), {}), Object.assign(el("span", "screw b"), {}));
+    root.appendChild(ear);
+  }
+
+  const face = el("div", "face");
+
+  const dim = el("div", "dimmark"); dim.textContent = "44.45 mm (1U)";
+  face.appendChild(dim);
+
+  const cl = el("div", "chrome left");
+  const brand = el("div", "brand"); brand.dataset.g = "◈"; brand.title = "vendor mark";
+  const status = el("div", "status");
+  for (const [k, cls] of [["syst", "on"], ["act", "blink"], ["poe", "on"]]) {
+    const s = el("span", "sled " + k + " " + cls); s.title = k.toUpperCase(); status.appendChild(s);
+  }
+  cl.append(brand, status);
+
+  const pf = el("div", "portfield");
+  if (spec.uplinks.side === "left") pf.appendChild(uplinkBank(spec, up));
+  pf.appendChild(mainBank(spec, rows));
+  if (spec.uplinks.side === "right") pf.appendChild(uplinkBank(spec, up));
+
+  const cr = el("div", "chrome right");
+  const model = el("div", "model"); model.textContent = spec.model;
+  const vents = el("div", "vents");
+  const console_ = el("div", "console");
+  const cRj = el("i", "c-rj"); cRj.title = "console";
+  const cUsb = el("i", "c-usb"); cUsb.title = "USB";
+  console_.append(cRj, cUsb);
+  cr.append(model, vents, console_);
+
+  face.append(cl, pf, cr);
+  root.appendChild(face);
+
+  spec.el = root;
+  spec.rows = rows;
+  spec.uplinks.resolved = up;
+  byId.set(spec.id, spec);
+  return root;
+}
+
+/* ================================================================
+   wires
+   ================================================================ */
+function offsetIn(node, ancestor) {
+  let x = 0, y = 0;
+  while (node && node !== ancestor) { x += node.offsetLeft; y += node.offsetTop; node = node.offsetParent; }
+  return { x, y };
+}
+
+function anchor(ref) {
+  const spec = byId.get(ref.sw);
+  const rec = portEls.get(ref.sw + ":" + ref.key);
+  const jack = rec.el.querySelector(".jack");
+  const o = offsetIn(jack, spec.el);
+  return { x: spec.x + o.x + jack.offsetWidth / 2, y: spec.y + o.y + jack.offsetHeight / 2 };
+}
+
+function wirePath(a, b) {
+  const dx = clamp(Math.abs(b.x - a.x) * 0.35, 40, 170);
+  const s = b.x >= a.x ? 1 : -1;
+  return `M${a.x},${a.y} C${a.x + dx * s},${a.y} ${b.x - dx * s},${b.y} ${b.x},${b.y}`;
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function drawWires() {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  for (const w of wires) {
+    const a = anchor(w.a), b = anchor(w.b);
+    const d = wirePath(a, b);
+    const g = document.createElementNS(SVG_NS, "g");
+    g.setAttribute("class", "wire");
+    const vis = document.createElementNS(SVG_NS, "path");
+    vis.setAttribute("class", "wire-visible");
+    vis.setAttribute("d", d);
+    const hit = document.createElementNS(SVG_NS, "path");
+    hit.setAttribute("class", "wire-hit");
+    hit.setAttribute("d", d);
+    hit.dataset.wire = w.id;
+    for (const pt of [a, b]) {
+      const c = document.createElementNS(SVG_NS, "circle");
+      c.setAttribute("class", "wire-cap");
+      c.setAttribute("cx", pt.x); c.setAttribute("cy", pt.y); c.setAttribute("r", 2.6);
+      g.appendChild(c);
+    }
+    g.append(vis, hit);
+    svg.appendChild(g);
+  }
+}
+
+function addWire(a, b) {
+  if (a.sw === b.sw && a.key === b.key) return;
+  if (wires.some(w => (w.a.sw === a.sw && w.a.key === a.key && w.b.sw === b.sw && w.b.key === b.key) ||
+                      (w.b.sw === a.sw && w.b.key === a.key && w.a.sw === b.sw && w.a.key === b.key))) return;
+  wires.push({ id: "w" + Date.now() + "-" + wires.length, a, b });
+  refreshConnectionLeds();
+  drawWires();
+}
+
+function removeWire(id) {
+  const i = wires.findIndex(w => w.id === id);
+  if (i >= 0) { wires.splice(i, 1); refreshConnectionLeds(); drawWires(); }
+}
+
+function refreshConnectionLeds() {
+  for (const rec of portEls.values()) rec.el.classList.remove("connected");
+  for (const w of wires) {
+    portEls.get(w.a.sw + ":" + w.a.key)?.el.classList.add("connected");
+    portEls.get(w.b.sw + ":" + w.b.key)?.el.classList.add("connected");
+  }
+}
+
+/* ================================================================
+   interactions
+   ================================================================ */
+function clearPending() {
+  if (pending) { pending.el.classList.remove("pending"); pending = null; }
+}
+
+function onPortClick(sw, key) {
+  const rec = portEls.get(sw + ":" + key);
+  if (!rec) return;
+  if (!pending) {
+    pending = { sw, key, el: rec.el };
+    rec.el.classList.add("pending");
+    return;
+  }
+  if (pending.sw === sw && pending.key === key) { clearPending(); return; }
+  addWire({ sw: pending.sw, key: pending.key }, { sw, key });
+  clearPending();
+}
+
+stage.addEventListener("click", (e) => {
+  const port = e.target.closest(".port");
+  if (port) { onPortClick(port.dataset.sw, port.dataset.port); e.stopPropagation(); return; }
+  const hit = e.target.closest(".wire-hit");
+  if (hit) { removeWire(hit.dataset.wire); return; }
+});
+
+viewport.addEventListener("click", (e) => {
+  if (!e.target.closest(".port") && !e.target.closest(".wire-hit")) clearPending();
+});
+
+/* --- drag switch / pan canvas --- */
+viewport.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest(".port") || e.target.closest(".wire-hit")) return;
+
+  const swEl = e.target.closest(".switch");
+  if (swEl) {
+    const spec = byId.get(swEl.dataset.sw);
+    const start = { x: e.clientX, y: e.clientY, sx: spec.x, sy: spec.y };
+    e.preventDefault();
+    const move = (ev) => {
+      spec.x = start.sx + (ev.clientX - start.x) / view.k;
+      spec.y = start.sy + (ev.clientY - start.y) / view.k;
+      swEl.style.left = spec.x + "px";
+      swEl.style.top = spec.y + "px";
+      drawWires();
+    };
+    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return;
+  }
+
+  const start = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+  viewport.classList.add("panning");
+  e.preventDefault();
+  const move = (ev) => {
+    view.x = start.vx + (ev.clientX - start.x);
+    view.y = start.vy + (ev.clientY - start.y);
+    applyView();
+  };
+  const up = () => {
+    viewport.classList.remove("panning");
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", up);
+  };
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", up);
+});
+
+viewport.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const k2 = clamp(view.k * Math.exp(-e.deltaY * 0.0016), 0.3, 4);
+  view.x = mx - (mx - view.x) * (k2 / view.k);
+  view.y = my - (my - view.y) * (k2 / view.k);
+  view.k = k2;
+  applyView();
+}, { passive: false });
+
+function applyView() {
+  stage.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  updateHud();
+}
+
+function zoomTo(k2, cx, cy) {
+  const r = viewport.getBoundingClientRect();
+  const mx = (cx ?? r.width / 2), my = (cy ?? r.height / 2);
+  k2 = clamp(k2, 0.3, 4);
+  view.x = mx - (mx - view.x) * (k2 / view.k);
+  view.y = my - (my - view.y) * (k2 / view.k);
+  view.k = k2;
+  applyView();
+}
+
+function fitAll(maxK, minK) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of SWITCH_SPECS) {
+    minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
+    maxX = Math.max(maxX, s.x + s.el.offsetWidth);
+    maxY = Math.max(maxY, s.y + s.el.offsetHeight);
+  }
+  const pad = 70;
+  const r = viewport.getBoundingClientRect();
+  const k = clamp(Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY)), minK ?? 0.3, maxK ?? 1.1);
+  view.k = k;
+  view.x = (r.width - (maxX - minX) * k) / 2 - minX * k;
+  view.y = (r.height - (maxY - minY) * k) / 2 - minY * k;
+  applyView();
+}
+
+/* ================================================================
+   hud / styles
+   ================================================================ */
+function narrowestPitch() {
+  return Math.min(...SWITCH_SPECS.map(s => mm(s.pitch) * view.k));
+}
+
+function updateHud() {
+  hudZoom.textContent = Math.round(view.k * 100) + "%";
+  const p = narrowestPitch();
+  hudPitch.textContent = p.toFixed(1) + "px";
+  hudNote.textContent = p >= 20 ? "comfortable" : p >= 14 ? "tight" : "too small to click";
+  hudNote.className = p >= 20 ? "pitch-ok" : p >= 14 ? "pitch-tight" : "pitch-bad";
+}
+
+function setStyle(i, push) {
+  styleIdx = (i + STYLES.length) % STYLES.length;
+  const s = STYLES[styleIdx];
+  document.body.dataset.style = s.id;
+  hudStyle.textContent = `${s.id.toUpperCase()} · ${s.name}`;
+  swName.textContent = `${s.id.toUpperCase()} · ${s.name}`;
+  document.querySelectorAll("#switcher .s-btn").forEach(b => b.classList.toggle("on", b.dataset.s === s.id));
+  if (push !== false) {
+    try { history.replaceState(null, "", "?style=" + s.id); } catch (_) { /* file:// */ }
+  }
+}
+
+document.getElementById("sw-prev").onclick = () => setStyle(styleIdx - 1);
+document.getElementById("sw-next").onclick = () => setStyle(styleIdx + 1);
+document.querySelectorAll("#switcher .s-btn").forEach(b => b.onclick = () => setStyle(STYLES.findIndex(s => s.id === b.dataset.s)));
+document.getElementById("btn-in").onclick  = () => zoomTo(view.k * 1.25);
+document.getElementById("btn-out").onclick = () => zoomTo(view.k / 1.25);
+document.getElementById("btn-100").onclick = () => zoomTo(1);
+document.getElementById("btn-fit").onclick = () => fitAll(1.1, 0.3);
+
+window.addEventListener("keydown", (e) => {
+  if (e.target instanceof Element && e.target.closest("input,textarea,[contenteditable]")) return;
+  if (e.key === "ArrowLeft")  setStyle(styleIdx - 1);
+  if (e.key === "ArrowRight") setStyle(styleIdx + 1);
+  if (e.key === "Escape") clearPending();
+});
+
+/* ================================================================
+   boot
+   ================================================================ */
+function boot() {
+  const q = new URLSearchParams(location.search).get("style");
+  const qi = STYLES.findIndex(s => s.id === q);
+  setStyle(qi >= 0 ? qi : 0, false);
+
+  for (const spec of SWITCH_SPECS) {
+    const rows = makeRj45(spec);
+    const up = makeUplinks(spec);
+    stage.appendChild(buildSwitch(spec, rows, up));
+  }
+  for (const [a, b] of SEED_WIRES) {
+    const [as, ak] = a.split(":"), [bs, bk] = b.split(":");
+    if (portEls.has(a) && portEls.has(b)) wires.push({ id: "seed-" + a + "-" + b, a: { sw: as, key: ak }, b: { sw: bs, key: bk } });
+    else console.warn("seed wire missing port", a, b);
+  }
+  refreshConnectionLeds();
+  drawWires();
+  fitAll(1.1, 0.72);   // overview on load, but never below a clickable port pitch
+  updateHud();
+}
+
+boot();
+</script>
+</body>
+</html>
