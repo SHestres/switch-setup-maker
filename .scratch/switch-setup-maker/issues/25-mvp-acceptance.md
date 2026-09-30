@@ -1,7 +1,7 @@
 # 25: MVP acceptance pass
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 16, 17, 18, 19, 20, 21, 22, 23, 24
 
 ## What to build
@@ -10,13 +10,22 @@ Run the whole MVP story on a production build served locally per the self-host i
 
 ## Acceptance criteria
 
-- [ ] The story passes end-to-end on the production build: presets and hand-built switches, layout edits, wiring, refresh persistence, export/import round-trip and deletions.
-- [ ] Small gaps found during the pass are fixed; anything bigger is captured as new tickets or fog.
-- [ ] The result is recorded in this ticket and the map's MVP phase can be declared complete.
+- [x] The story passes end-to-end on the production build: presets and hand-built switches, layout edits, wiring, refresh persistence, export/import round-trip and deletions.
+- [x] Small gaps found during the pass are fixed; anything bigger is captured as new tickets or fog.
+- [x] The result is recorded in this ticket and the map's MVP phase can be declared complete.
 
 ## Answer
 
-Acceptance-fix pass on branch `ticket/25-acceptance-fixes` (based on `integration/mvp` @ `b96f51f`). Three gaps fixed; the ticket stays `claimed` because the coordinator re-runs acceptance and records the final result.
+**Coordinator final acceptance — `integration/mvp` @ `1b72862`, production build served locally (`node scripts/serve.mjs`), headless Chromium:**
+
+- **Story pass: 131/131 assertions PASS** in a fresh browser — first-run card and copy; add from all four presets with exact stored/DOM layouts (Unifi model prefill, 12-port even-top zero-based, SFP restarts); start-blank ghost draft never reaching the document or storage before commit; name/model/row/count/kind/speed/numbering edits with inline validation (0 and 49 rejected) and live label regeneration; cross- and same-switch wiring with the exact busy/duplicate/self-link hint copy; Esc and empty-canvas cancels leaving storage untouched; cable selection (inspector stays closed), affordance and Delete-key deletion freeing both ports; delete-switch confirm naming the switch and severed connection count; full refresh restore (switches, cables, moved switch, pan+zoom, theme, cable layer); export pretty JSON equal to the document; malformed import naming the first problem; re-import restoring the setup. Zero console/page errors. Evidence: `/tmp/opencode/ssm-accept/story/evidence.md` (+ 18 screenshots, storage snapshots, `exported.json`).
+- **Visual/edge pass: all sections PASS** — three themes at density (light diagrammatic, dark keeps the 22px dot grid, blueprint 26px line grid; chrome honest and inert); wire endpoints align with port anchors at **0.0000 px** deviation across 48-port, 12-port and SFP densities and multiple zooms; cable above/behind DOM ordering and persistence correct; blueprint always-above with the stored `behind` preference intact; hit-testing isolation both ways; pending wire above with cables behind; Delete/Backspace guarded while typing; mouse drag, wheel zoom and pan persistence; the same `dist/` served from a sub-path with zero 404s. Evidence: `/tmp/opencode/ssm-accept/visual/evidence.md` (+ 19 screenshots).
+- **Gaps fixed** on `ticket/25-acceptance-fixes` (merge `1b72862`): wheel zoom proportional (one notch 2.5 → **1.15**, clamps only after ~20 notches); clearance sag so short same-switch cables are selectable in "cables behind" mode (endpoint alignment unchanged at 0.0000 px); light-theme micro-label contrast 2.66 → **4.76:1**, `.sw-tag` 4.20 → **4.81:1**.
+- **Re-verification of the merged build** with the reusable probe `/tmp/opencode/ssm-accept/probes/verify-fixes.mjs` (`PROBE_TAG=merged`): **23/23 checks, 0 console/page errors**. `npm test` 196/196, `npm run build`, `npm run lint` green on the merged tip.
+- **Carried forward, non-blocking:** connected-jack fill vs empty is subtle (~1.6–2.3:1; the lit LED carries the signal); steep same-switch spans (`|Δy| > 24`) can still be fully hidden in behind mode; light-theme `.cage-num` stays painted under the SFP jack (pre-existing order). **Docker `build`/`run` remains unexecuted in this environment** (no container runtime) — [24](24-self-host-path.md)'s `[~]` box stays for a Docker-capable machine.
+- **MVP phase complete.** The hosted-home/publish work (old ticket 15) remains off-queue by decision: the user tests locally and deploys on their own server.
+
+### Acceptance-fix pass detail (branch `ticket/25-acceptance-fixes`, base `b96f51f`)
 
 ### 1. Wheel zoom far too coarse (story G2)
 
