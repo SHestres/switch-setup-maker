@@ -3,8 +3,9 @@
 A local-first web app for modelling network switch setups: switches rendered as faceplates on a
 canvas, wired port-to-port. Static build, no backend — data stays in the browser.
 
-**Status**: scaffold only. The MVP is being built ticket by ticket; the plan lives in the
-[wayfinder map](.scratch/switch-setup-maker/map.md).
+**Status**: MVP in progress, ticket by ticket; the plan lives in the
+[wayfinder map](.scratch/switch-setup-maker/map.md). The domain model, autosave/restore and JSON
+import/export have landed — the switch builder and canvas are next.
 
 ## Requirements
 
@@ -50,7 +51,7 @@ reachable from other machines and containers. Override per environment:
 
 ```
 src/
-├── model/    domain: Setup, Switch, Port, Connection — plain TypeScript, no render types
+├── model/    domain + persistence: document types, layout, connections, storage, React binding
 ├── canvas/   faceplates, wire overlay, viewport interaction
 ├── ui/       app chrome: app bar, inspector, dialogs
 └── test/     shared Vitest setup

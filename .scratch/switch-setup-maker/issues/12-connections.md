@@ -25,3 +25,4 @@ Done when two switches can be wired port-to-port, the pair survives a refresh, a
   - Rejected links (port already in use, self-link, duplicate pair) show a **transient hint near the port** — e.g. “Port 24 is already connected” — never silence.
   - Ports are wiring gestures only; switch selection comes from body clicks, so connection clicks never open the inspector.
   - Draft switches are non-interactable, so ports on a pending draft can't be wired or selected.
+- 2026-09-30 — **Model layer landed** ([09](09-model-persistence.md)). `src/model/connections.ts` has the rules: `connect(setup, a, b)` returns `{ ok: true, setup }` or `{ ok: false, problem }`, and `problem.message` is ready for the transient hint ("Port 24 is already connected."), with `problem.port` pointing at the offending port. `disconnect`, `removeSwitch` and `removePorts` purge as 05 requires; `isPortConnected` answers the styling question.
