@@ -12,7 +12,7 @@ describe('WireLayer', () => {
 
     const layer = screen.getByTestId('wire-layer')
     const path = layer.querySelector('[data-connection="sw1:p1-sw2:p2"]')
-    expect(layer.querySelectorAll('path')).toHaveLength(1)
+    expect(layer.querySelectorAll('path[data-connection]')).toHaveLength(1)
     expect(path).toBeInTheDocument()
   })
 
@@ -26,7 +26,7 @@ describe('WireLayer', () => {
     render(<WireLayer setup={setup} />)
 
     const layer = screen.getByTestId('wire-layer')
-    expect(layer.querySelectorAll('path')).toHaveLength(2)
+    expect(layer.querySelectorAll('path[data-connection]')).toHaveLength(2)
     expect(layer.querySelector('[data-connection="sw1:p1-sw1:p2"]')).toBeInTheDocument()
   })
 
@@ -35,6 +35,8 @@ describe('WireLayer', () => {
 
     render(<WireLayer setup={setup} />)
 
-    expect(screen.getByTestId('wire-layer').querySelectorAll('path')).toHaveLength(0)
+    expect(screen.getByTestId('wire-layer').querySelectorAll('path[data-connection]')).toHaveLength(
+      0,
+    )
   })
 })

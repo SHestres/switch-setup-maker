@@ -119,7 +119,7 @@ describe('Canvas', () => {
 
     const layer = screen.getByTestId('wire-layer')
     expect(layer.closest('#canvas-content')).not.toBeNull()
-    expect(layer.querySelectorAll('path')).toHaveLength(1)
+    expect(layer.querySelectorAll('path[data-connection]')).toHaveLength(1)
   })
 
   it('marks connected ports so their jack fill changes, both ends of the wire', () => {

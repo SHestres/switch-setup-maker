@@ -1,44 +1,72 @@
+import { samePair } from '@/model/connections'
 import type { Connection, PortRef, Setup } from '@/model/types'
 
-import { connectionCurve, pointForPort, wireCurve } from './geometry'
-import type { PendingWire } from './wiring'
+import { connectionCurve, connectionMidpoint } from './geometry'
 
 export interface WireLayerProps {
   setup: Setup
-  /** The ephemeral wire being drawn; never part of the document. */
-  pending?: PendingWire | null
+  /** The selected Connection, by unordered pair; ephemeral UI state. */
+  selected?: Connection | null
+  /** Select a cable. Never opens the Switch inspector. */
+  onSelectConnection?: (connection: Connection) => void
+  /** Delete a cable from the affordance at its midpoint. */
+  onDeleteConnection?: (connection: Connection) => void
 }
 
 /**
  * One SVG overlay in the canvas transform holding a curve for every
- * Connection in the Setup, plus the pending wire while one is being drawn.
- * Endpoints are model-derived (see `geometry.ts`); the cable-above/behind
- * rule is ticket 23's, so for now the layer paints over the faceplates.
+ * Connection in the Setup. Each cable carries an invisible, generously wide
+ * hit target; the selected cable is highlighted and gets a delete affordance
+ * anchored to its midpoint. The cable-above/behind ordering is decided by
+ * where the Canvas places this layer.
  */
-export function WireLayer({ setup, pending }: WireLayerProps) {
-  let pendingPath: string | null = null
-  if (pending) {
-    const from = pointForPort(setup, pending.from)
-    // Without a live pointer the wire collapses to its source anchor.
-    if (from) pendingPath = wireCurve(from, pending.to ?? from)
-  }
+export function WireLayer({
+  setup,
+  selected = null,
+  onSelectConnection,
+  onDeleteConnection,
+}: WireLayerProps) {
+  const midpoint = selected ? connectionMidpoint(setup, selected) : undefined
 
   return (
-    <svg className="wire-layer" data-testid="wire-layer" aria-hidden="true" width={1} height={1}>
-      {setup.connections.map((connection) => {
-        const d = connectionCurve(setup, connection)
-        if (!d) return null
-        const key = connectionKey(connection)
-        return <path key={key} d={d} data-connection={key} />
-      })}
-      {pendingPath && pending && (
-        <path
-          className="pending"
-          data-pending={`${pending.from.switch}:${pending.from.port}`}
-          d={pendingPath}
-        />
+    <>
+      <svg className="wire-layer" data-testid="wire-layer" aria-hidden="true" width={1} height={1}>
+        {setup.connections.map((connection) => {
+          const d = connectionCurve(setup, connection)
+          if (!d) return null
+          const key = connectionKey(connection)
+          const isSelected = selected !== null && samePair(connection, selected.a, selected.b)
+          return (
+            <g key={key} className="wire">
+              <path className={isSelected ? 'wire selected' : 'wire'} d={d} data-connection={key} />
+              <path
+                className="wire-hit"
+                d={d}
+                data-wire-hit={key}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onSelectConnection?.(connection)
+                }}
+              />
+            </g>
+          )
+        })}
+      </svg>
+      {selected && midpoint && (
+        <button
+          type="button"
+          className="wire-actions"
+          data-wire-actions={connectionKey(selected)}
+          style={{ left: midpoint.x, top: midpoint.y }}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDeleteConnection?.(selected)
+          }}
+        >
+          Delete cable
+        </button>
       )}
-    </svg>
+    </>
   )
 }
 

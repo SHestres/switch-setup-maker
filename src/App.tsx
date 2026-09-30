@@ -5,12 +5,13 @@ import { DEFAULT_CANVAS_SIZE, placeNewSwitch } from '@/canvas/placement'
 import type { Size } from '@/canvas/placement'
 import { WIRE_HINT_MS } from '@/canvas/wiring'
 import type { WireHintState } from '@/canvas/wiring'
-import { connect, connectionsTouchingSwitch, removeSwitch } from '@/model/connections'
+import { connect, connectionsTouchingSwitch, disconnect, removeSwitch } from '@/model/connections'
 import {
   findPort,
   moveSwitch,
   nextSwitchId,
   resetSetup,
+  setCableLayer,
   setTheme,
   setViewport,
 } from '@/model/document'
@@ -18,7 +19,7 @@ import { applyLayoutEdit, countSeveredConnections, planLayoutEdit } from '@/mode
 import type { LayoutEdit } from '@/model/layoutEdit'
 import { switchFromPreset } from '@/model/presets'
 import type { LayoutPreset } from '@/model/presets'
-import type { PortRef, Switch } from '@/model/types'
+import type { Connection, PortRef, Switch } from '@/model/types'
 import { useDocument } from '@/model/useDocument'
 import { AppBar } from '@/ui/AppBar'
 import { Dialog } from '@/ui/Dialog'
@@ -70,6 +71,8 @@ export default function App() {
   const [canvasSize, setCanvasSize] = useState<Size>(DEFAULT_CANVAS_SIZE)
   /** The Port a pending wire starts from; ephemeral UI state, never persisted. */
   const [pendingPort, setPendingPort] = useState<PortRef | null>(null)
+  /** The selected cable, by unordered pair; ephemeral UI state, never persisted. */
+  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null)
   /** A connection refusal near its offending Port; fades on its own. */
   const [wireHint, setWireHint] = useState<WireHintState | null>(null)
 
@@ -79,17 +82,46 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [wireHint])
 
-  // Escape abandons a pending wire (and its hint). An open confirm owns the key.
+  // Escape abandons a pending wire (and its hint) and drops the cable selection.
+  // An open confirm owns the key.
   useEffect(() => {
-    if ((!pendingPort && !wireHint) || confirm) return
+    if ((!pendingPort && !wireHint && !selectedConnection) || confirm) return
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       setPendingPort(null)
       setWireHint(null)
+      setSelectedConnection(null)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [pendingPort, wireHint, confirm])
+  }, [pendingPort, wireHint, selectedConnection, confirm])
+
+  // Delete/Backspace removes the selected cable. Text fields keep their own keys,
+  // so an edit in the inspector never severs a connection.
+  useEffect(() => {
+    if (!selectedConnection || confirm) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return
+      }
+      event.preventDefault()
+      setDocument((current) => ({
+        ...current,
+        setup: disconnect(current.setup, selectedConnection.a, selectedConnection.b),
+      }))
+      setSelectedConnection(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedConnection, confirm, setDocument])
 
   const selectedSwitchId = inspector?.mode === 'editor' ? inspector.switchId : null
   const selectedSwitch = selectedSwitchId
@@ -112,7 +144,19 @@ export default function App() {
   }
   const closeInspector = () => leaveInspector('close')
   const openGallery = () => leaveInspector('gallery')
-  const selectSwitch = (switchId: string) => leaveInspector({ switchId })
+  const selectSwitch = (switchId: string) => {
+    setSelectedConnection(null)
+    leaveInspector({ switchId })
+  }
+
+  /** Removing the Connection frees both Ports; the selection is ephemeral. */
+  const deleteConnection = (connection: Connection) => {
+    setDocument((current) => ({
+      ...current,
+      setup: disconnect(current.setup, connection.a, connection.b),
+    }))
+    setSelectedConnection(null)
+  }
 
   const startBlank = () => {
     setDraft(
@@ -246,6 +290,7 @@ export default function App() {
           setDraft(null)
           setInspector(null)
           setPendingPort(null)
+          setSelectedConnection(null)
           setWireHint(null)
         }}
         onNewSetup={() => {
@@ -253,10 +298,14 @@ export default function App() {
           setDraft(null)
           setInspector(null)
           setPendingPort(null)
+          setSelectedConnection(null)
           setWireHint(null)
         }}
         onAddSwitch={openGallery}
         onThemeChange={(theme) => setDocument((current) => setTheme(current, theme))}
+        onCableLayerChange={(cableLayer) =>
+          setDocument((current) => setCableLayer(current, cableLayer))
+        }
       />
       <main className="relative flex-1 overflow-hidden">
         <Canvas
@@ -272,9 +321,13 @@ export default function App() {
           onClearSelection={() => {
             closeInspector()
             setPendingPort(null)
+            setSelectedConnection(null)
             setWireHint(null)
           }}
           onPortClick={handlePortClick}
+          selectedConnection={selectedConnection}
+          onSelectConnection={setSelectedConnection}
+          onDeleteConnection={deleteConnection}
           pendingPort={pendingPort}
           hint={wireHint}
         />
