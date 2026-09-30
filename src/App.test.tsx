@@ -634,3 +634,50 @@ describe('inspector overlay', () => {
     expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
   })
 })
+
+function canvasRoot(): HTMLElement {
+  const root = document.querySelector<HTMLElement>('.canvas-root')
+  if (!root) throw new Error('canvas root is not rendered')
+  return root
+}
+
+describe('themes', () => {
+  it('switches the canvas theme immediately from the app bar', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }))
+
+    expect(canvasRoot()).toHaveAttribute('data-theme', 'dark')
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('keeps the chosen theme across a refresh', () => {
+    const app = render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Blueprint' }))
+
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.ui.theme).toBe('blueprint')
+
+    app.unmount()
+    render(<App />)
+
+    expect(canvasRoot()).toHaveAttribute('data-theme', 'blueprint')
+    expect(screen.getByRole('button', { name: 'Blueprint' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('restores the stored theme on load', () => {
+    const stored = sampleDocument()
+    stored.ui.theme = 'dark'
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(stored))
+
+    render(<App />)
+
+    expect(canvasRoot()).toHaveAttribute('data-theme', 'dark')
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'false')
+  })
+})

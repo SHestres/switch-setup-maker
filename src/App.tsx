@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Canvas } from '@/canvas/Canvas'
 import { DEFAULT_CANVAS_SIZE, placeNewSwitch } from '@/canvas/placement'
 import type { Size } from '@/canvas/placement'
-import { moveSwitch, nextSwitchId, resetSetup, setViewport } from '@/model/document'
+import { moveSwitch, nextSwitchId, resetSetup, setTheme, setViewport } from '@/model/document'
 import { switchFromPreset } from '@/model/presets'
 import type { LayoutPreset } from '@/model/presets'
 import { useDocument } from '@/model/useDocument'
@@ -69,6 +69,7 @@ export default function App() {
           closeInspector()
         }}
         onAddSwitch={openGallery}
+        onThemeChange={(theme) => setDocument((current) => setTheme(current, theme))}
       />
       <main className="relative flex-1 overflow-hidden">
         <Canvas
