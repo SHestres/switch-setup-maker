@@ -1,7 +1,7 @@
 # 18: Themes & skinning
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 16
 
 ## What to build
