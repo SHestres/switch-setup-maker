@@ -1,7 +1,7 @@
 # 26: Section model, per-section numbering & migration
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately)
 
 ## What to build
