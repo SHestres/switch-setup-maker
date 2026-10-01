@@ -785,7 +785,7 @@ describe('wires', () => {
     expect(wireLayer().querySelectorAll('path[data-connection]')).toHaveLength(1)
   })
 
-  it('gives connected ports the wired jack class, restored across a refresh', () => {
+  it('gives connected ports the wired connector styling, restored across a refresh', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     const app = render(<App />)
 
@@ -942,6 +942,22 @@ describe('switch layout editor', () => {
 
     expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['2', '4'])
     expect(screen.getByRole('button', { name: 'RJ45 port 4 (1G) on Core' })).toBeInTheDocument()
+  })
+
+  it('shows a bottom-first section’s printed range, not its first and last labels', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    const rows = within(panel).getByLabelText('Section 1 rows')
+    fireEvent.change(rows, { target: { value: '2' } })
+    fireEvent.blur(rows)
+    fireEvent.change(within(panel).getByLabelText('Section 1 numbering'), {
+      target: { value: 'alternating-bottom-first' },
+    })
+
+    expect(within(panel).getByText('1–4')).toBeInTheDocument()
   })
 
   it('pins a custom start only when the user asks for one', () => {
@@ -1141,6 +1157,54 @@ describe('switch layout editor', () => {
       fireEvent.click(within(panel).getByRole('button', { name: 'Add section' }))
 
       expect(panel.style.height).toBe('420px')
+    } finally {
+      scrollHeight.mockRestore()
+    }
+  })
+
+  it('keeps auto-fitting after a click on the resize handle without a drag', () => {
+    // A click is not a drag: the handle must not own the panel until it moves.
+    const scrollHeight = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(300)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      render(<App />)
+      openCoreEditor()
+      const panel = inspector()
+      expect(panel.style.height).toBe('300px')
+
+      fireEvent.mouseDown(within(panel).getByRole('separator', { name: 'Resize panel' }), {
+        clientY: 400,
+      })
+      fireEvent.mouseUp(window, { clientY: 400 })
+
+      scrollHeight.mockReturnValue(420)
+      fireEvent.click(within(panel).getByRole('button', { name: 'Add section' }))
+
+      expect(panel.style.height).toBe('420px')
+    } finally {
+      scrollHeight.mockRestore()
+    }
+  })
+
+  it('lets a real drag take the panel height over for the session', () => {
+    const scrollHeight = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(300)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      render(<App />)
+      openCoreEditor()
+      const panel = inspector()
+
+      fireEvent.mouseDown(within(panel).getByRole('separator', { name: 'Resize panel' }), {
+        clientY: 400,
+      })
+      fireEvent.mouseMove(window, { clientY: 380 })
+      fireEvent.mouseUp(window, { clientY: 380 })
+      expect(panel.style.height).toBe('320px')
+
+      scrollHeight.mockReturnValue(500)
+      fireEvent.click(within(panel).getByRole('button', { name: 'Add section' }))
+
+      expect(panel.style.height).toBe('320px')
     } finally {
       scrollHeight.mockRestore()
     }

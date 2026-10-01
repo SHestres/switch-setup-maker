@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import { generateSectionLabels, resolveSectionStarts } from '@/model/layout'
+import { resolveSectionStarts, sectionLabelRange } from '@/model/layout'
 import type { SectionSpec } from '@/model/layout'
 import type { SectionEdit } from '@/model/layoutEdit'
 import type { PortKind, SectionNumbering, SectionStartMode } from '@/model/types'
@@ -42,14 +42,6 @@ const START_MODE_LABELS: Record<SectionStartMode, string> = {
 }
 
 const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP', 'sfp+': 'SFP+' }
-
-/** The labels a section covers at its resolved start, e.g. `1–16`. */
-function labelRange(spec: SectionSpec, start: number): string {
-  const labels = generateSectionLabels(spec, start).flat()
-  const first = labels[0]
-  const last = labels[labels.length - 1]
-  return first === last ? first : `${first}–${last}`
-}
 
 export interface SwitchFieldsProps {
   name: string
@@ -204,11 +196,12 @@ function SectionCard({
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Section {sectionNumber}
         </span>
-        <span className="text-xs text-muted-foreground">{labelRange(spec, start)}</span>
+        <span className="text-xs text-muted-foreground">{sectionLabelRange(spec, start)}</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <NumberField
           label={`Section ${sectionNumber} rows`}
+          text="rows"
           value={spec.rows}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
@@ -216,6 +209,7 @@ function SectionCard({
         />
         <NumberField
           label={`Section ${sectionNumber} columns`}
+          text="columns"
           value={spec.columns}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
@@ -260,6 +254,7 @@ function SectionCard({
         <div className="col-span-2">
           <NumberField
             label={`Section ${sectionNumber} start number`}
+            text="start number"
             value={pinnedStart}
             min={START_MIN}
             max={START_MAX}
@@ -341,7 +336,10 @@ function SelectField<T extends string>({
 }
 
 interface NumberFieldProps {
+  /** The accessible name, e.g. `Section 2 rows`. */
   label: string
+  /** The visible short label. */
+  text: string
   value: number
   min: number
   max: number
@@ -353,12 +351,20 @@ interface NumberFieldProps {
  * A number is committed on blur or Enter, not per keystroke: "2" on the way to "24" is a
  * different layout, and each invalid or intermediate value must never reach the document.
  */
-function NumberField({ label, value, min, max, disabled = false, onCommit }: NumberFieldProps) {
+function NumberField({
+  label,
+  text,
+  value,
+  min,
+  max,
+  disabled = false,
+  onCommit,
+}: NumberFieldProps) {
   // `draft` holds uncommitted typing; the model value shows through once it clears.
   const [draft, setDraft] = useState<string | null>(null)
   const errorId = useId()
-  const text = draft ?? String(value)
-  const parsed = /^\d+$/.test(text.trim()) ? Number(text) : null
+  const shown = draft ?? String(value)
+  const parsed = /^\d+$/.test(shown.trim()) ? Number(shown) : null
   const invalid = parsed === null || parsed < min || parsed > max
 
   const commit = () => {
@@ -368,7 +374,7 @@ function NumberField({ label, value, min, max, disabled = false, onCommit }: Num
 
   return (
     <label className="flex flex-col gap-1">
-      <span className={labelText}>{label.replace(/^Section \d+ /, '')}</span>
+      <span className={labelText}>{text}</span>
       <input
         type="number"
         min={min}
@@ -379,7 +385,7 @@ function NumberField({ label, value, min, max, disabled = false, onCommit }: Num
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? errorId : undefined}
         disabled={disabled}
-        value={text}
+        value={shown}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {

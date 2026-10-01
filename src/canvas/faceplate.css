@@ -14,11 +14,11 @@
   --face-radius: 8px;
   --face-border: 1px solid #d9dfe7;
   --face-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 5px 14px rgba(16, 24, 40, 0.05);
-  --jack-bg: #f1f4f8;
-  --jack-border: 1px solid #cbd5e1;
-  --jack-radius: 3px;
-  --jack-shadow: none;
-  --jack-connected-bg: #aab6c4;
+  --connector-bg: #f1f4f8;
+  --connector-border: 1px solid #cbd5e1;
+  --connector-radius: 3px;
+  --connector-shadow: none;
+  --connector-connected-bg: #aab6c4;
   --latch-bg: #94a3b8;
   --led-off: #d7dde5;
   --led-on: #22c55e;
@@ -298,10 +298,10 @@
 
 .canvas-root .console i {
   display: block;
-  border: var(--jack-border);
+  border: var(--connector-border);
   border-radius: 2px;
-  background: var(--jack-bg);
-  box-shadow: var(--jack-shadow);
+  background: var(--connector-bg);
+  box-shadow: var(--connector-shadow);
 }
 
 .canvas-root .console .c-rj {
@@ -373,16 +373,16 @@
   color: inherit;
 }
 
-.canvas-root .port .jack {
+.canvas-root .port .connector {
   position: absolute;
   top: 4px;
   right: 2px;
   bottom: 2px;
   left: 2px;
-  border: var(--jack-border);
-  border-radius: var(--jack-radius);
-  background-color: var(--jack-bg);
-  box-shadow: var(--jack-shadow);
+  border: var(--connector-border);
+  border-radius: var(--connector-radius);
+  background-color: var(--connector-bg);
+  box-shadow: var(--connector-shadow);
 }
 
 .canvas-root .port .led {
@@ -396,8 +396,8 @@
   box-shadow: var(--led-socket);
 }
 
-.canvas-root .port.kind-sfp .jack,
-.canvas-root .port.kind-sfpp .jack {
+.canvas-root .port.kind-sfp .connector,
+.canvas-root .port.kind-sfpp .connector {
   top: 2px;
   bottom: 2px;
   border-color: var(--sfp-border);
@@ -416,29 +416,29 @@
   background: var(--latch-bg);
 }
 
-.canvas-root .port:hover .jack {
+.canvas-root .port:hover .connector {
   border-color: var(--accent);
 }
 
 /* The Port a pending wire starts from. */
-.canvas-root .port.pending .jack {
+.canvas-root .port.pending .connector {
   border-color: var(--accent);
   outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
 
-.canvas-root .port:focus-visible .jack {
+.canvas-root .port:focus-visible .connector {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-/* Wired ports: a distinct grey jack fill in addition to the lit LED. */
-.canvas-root .port.connected .jack {
-  background-color: var(--jack-connected-bg);
+/* Wired ports: a distinct grey connector fill in addition to the lit LED. */
+.canvas-root .port.connected .connector {
+  background-color: var(--connector-connected-bg);
 }
 
-.canvas-root .port.kind-sfp.connected .jack,
-.canvas-root .port.kind-sfpp.connected .jack {
+.canvas-root .port.kind-sfp.connected .connector,
+.canvas-root .port.kind-sfpp.connected .connector {
   background-color: var(--sfp-connected-bg);
 }
 
@@ -448,7 +448,7 @@
 }
 
 /*
- * Dark "photoreal": metal-gradient bodies and sunken jacks. Per the spec the
+ * Dark "photoreal": metal-gradient bodies and sunken connectors. Per the spec the
  * canvas keeps the light theme's dot grid, dark-tinted; prototype B has none.
  */
 .canvas-root[data-theme='dark'] {
@@ -458,11 +458,11 @@
   --face-radius: 3px;
   --face-border: 1px solid #0a0c0e;
   --face-shadow: 0 12px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --jack-bg: #0a0c0e;
-  --jack-border: 1px solid #181c1f;
-  --jack-radius: 2px;
-  --jack-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
-  --jack-connected-bg: #3a444f;
+  --connector-bg: #0a0c0e;
+  --connector-border: 1px solid #181c1f;
+  --connector-radius: 2px;
+  --connector-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --connector-connected-bg: #3a444f;
   --latch-bg: #8b96a3;
   --led-off: #24292e;
   --led-on: #3ee06a;
@@ -487,7 +487,7 @@
   --sfp-image: linear-gradient(180deg, #050607, #101316);
 }
 
-.canvas-root[data-theme='dark'] .port.kind-rj45 .jack {
+.canvas-root[data-theme='dark'] .port.kind-rj45 .connector {
   border-bottom-color: #2c3238;
 }
 
@@ -523,11 +523,11 @@
   --face-border: 1.5px solid #bfe0ff;
   --face-shadow: none;
   --face-font: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --jack-bg: rgba(4, 18, 34, 0.35);
-  --jack-border: 1px solid #8ec6f5;
-  --jack-radius: 1px;
-  --jack-shadow: none;
-  --jack-connected-bg: rgba(125, 211, 252, 0.3);
+  --connector-bg: rgba(4, 18, 34, 0.35);
+  --connector-border: 1px solid #8ec6f5;
+  --connector-radius: 1px;
+  --connector-shadow: none;
+  --connector-connected-bg: rgba(125, 211, 252, 0.3);
   --latch-bg: #7dd3fc;
   --led-off: rgba(255, 255, 255, 0.1);
   --led-on: #7dd3fc;

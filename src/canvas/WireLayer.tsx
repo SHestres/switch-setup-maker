@@ -1,9 +1,9 @@
 import { samePair } from '@/model/connections'
+import { portKey } from '@/model/portRef'
 import type { Connection, Setup } from '@/model/types'
 
 import { connectionCurve, connectionMidpoint } from './geometry'
 import type { MovedSwitch } from './geometry'
-import { portKey } from './portRef'
 
 export interface WireLayerProps {
   setup: Setup

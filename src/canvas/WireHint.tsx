@@ -1,8 +1,8 @@
 import { findSwitch } from '@/model/document'
+import { portKey } from '@/model/portRef'
 import type { Setup } from '@/model/types'
 
 import { portAnchor } from './geometry'
-import { portKey } from './portRef'
 import type { WireHintState } from './wiring'
 
 export interface WireHintProps {

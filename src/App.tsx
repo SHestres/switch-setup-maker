@@ -146,6 +146,15 @@ export default function App() {
     leaveInspector({ switchId })
   }
 
+  /** Drop every ephemeral UI state after the document as a whole changes. */
+  const clearEphemeralState = () => {
+    setDraft(null)
+    setInspector(null)
+    setPendingPort(null)
+    setSelectedConnection(null)
+    setWireHint(null)
+  }
+
   /** Removing the Connection frees both Ports; the selection is ephemeral. */
   const deleteConnection = (connection: Connection) => {
     setDocument((current) => ({
@@ -278,19 +287,11 @@ export default function App() {
         document={document}
         onReplace={(next) => {
           setDocument(next)
-          setDraft(null)
-          setInspector(null)
-          setPendingPort(null)
-          setSelectedConnection(null)
-          setWireHint(null)
+          clearEphemeralState()
         }}
         onNewSetup={() => {
           setDocument((current) => resetSetup(current))
-          setDraft(null)
-          setInspector(null)
-          setPendingPort(null)
-          setSelectedConnection(null)
-          setWireHint(null)
+          clearEphemeralState()
         }}
         onAddSwitch={openGallery}
         onThemeChange={(theme) => setDocument((current) => setTheme(current, theme))}
