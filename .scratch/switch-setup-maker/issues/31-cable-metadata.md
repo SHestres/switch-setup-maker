@@ -1,7 +1,7 @@
 # 31: Cable metadata — colour, length & type
 
 Type: grilling
-Status: ready-for-agent
+Status: claimed
 Blocked by: None
 
 ## Question
