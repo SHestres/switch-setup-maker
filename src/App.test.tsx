@@ -1037,6 +1037,115 @@ describe('switch layout editor', () => {
     expect(storedLayout().sections.map((section) => section.kind)).toEqual(['rj45', 'sfp+'])
   })
 
+  it('re-renders the faceplate Sections in their new left-to-right order after a move', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    const core = screen.getByRole('group', { name: 'Core' })
+    const portNames = () =>
+      within(core)
+        .getAllByRole('button')
+        .map((port) => port.getAttribute('aria-label'))
+
+    expect(portNames()).toEqual([
+      'RJ45 port 1 (1G) on Core',
+      'RJ45 port 3 (1G) on Core',
+      'SFP+ port 1 (10G) on Core',
+    ])
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move section 2 left' }))
+
+    expect(portNames()).toEqual([
+      'SFP+ port 1 (10G) on Core',
+      'RJ45 port 2 (1G) on Core',
+      'RJ45 port 4 (1G) on Core',
+    ])
+  })
+
+  it('chains Auto starts after the previous highest label when an earlier section resizes', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Unifi 48 Port' }))
+    const panel = inspector()
+    const columns = within(panel).getByLabelText('Section 1 columns')
+
+    fireEvent.change(columns, { target: { value: '6' } })
+    fireEvent.blur(columns)
+
+    // 2×6 alternating covers 1–12; later sections keep their 2×8 grids and re-chain.
+    expect(storedLayout().sections.map((section) => section.start)).toEqual([1, 13, 29, 45])
+    expect(
+      screen.getByRole('button', { name: 'RJ45 port 13 (1G) on Unifi 48 Port' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'SFP+ port 45 (10G) on Unifi 48 Port' }),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps a Custom start pinned while resizing renumbers the following Auto sections', () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Unifi 48 Port' }))
+    const panel = inspector()
+
+    fireEvent.change(within(panel).getByLabelText('Section 2 start mode'), {
+      target: { value: 'custom' },
+    })
+    const start = within(panel).getByLabelText('Section 2 start number')
+    fireEvent.change(start, { target: { value: '5' } })
+    fireEvent.blur(start)
+    const columns = within(panel).getByLabelText('Section 1 columns')
+    fireEvent.change(columns, { target: { value: '6' } })
+    fireEvent.blur(columns)
+
+    // The pinned 2×8 alternating section covers 5–20; the auto chain resumes at 21.
+    expect(storedLayout().sections.map((section) => section.start)).toEqual([1, 5, 21, 37])
+    expect(
+      screen.getByRole('button', { name: 'RJ45 port 21 (2.5G) on Unifi 48 Port' }),
+    ).toBeInTheDocument()
+  })
+
+  it('drags the bottom panel taller without moving the canvas viewport', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+    const before = Number.parseInt(panel.style.height, 10)
+
+    fireEvent.mouseDown(within(panel).getByRole('separator', { name: 'Resize panel' }), {
+      clientY: 400,
+    })
+    fireEvent.mouseMove(window, { clientY: 300 })
+    fireEvent.mouseUp(window)
+
+    expect(Number.parseInt(panel.style.height, 10)).toBeGreaterThan(before)
+    expect(storedViewport()).toEqual({ x: 0, y: 0, zoom: 1 })
+  })
+
+  it('auto-fits the panel to its content on open and after a section is added', () => {
+    // jsdom cannot lay out content, so the content height is stubbed: the panel
+    // must follow it while the user has not dragged the handle.
+    const scrollHeight = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(300)
+    try {
+      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+      render(<App />)
+      openCoreEditor()
+      const panel = inspector()
+      expect(panel.style.height).toBe('300px')
+
+      scrollHeight.mockReturnValue(420)
+      fireEvent.click(within(panel).getByRole('button', { name: 'Add section' }))
+
+      expect(panel.style.height).toBe('420px')
+    } finally {
+      scrollHeight.mockRestore()
+    }
+  })
+
   it('removes an unconnected section immediately and never lets the last section go', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)

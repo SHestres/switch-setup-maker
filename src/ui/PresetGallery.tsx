@@ -16,16 +16,16 @@ export function PresetGallery({ onPick, onStartBlank }: PresetGalleryProps) {
   const [previewed, setPreviewed] = useState<LayoutPreset | null>(null)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-3">
       <p className="text-sm text-muted-foreground">
         Pick a preset to place a fully configured switch on the canvas.
       </p>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
         {LAYOUT_PRESETS.map((preset) => (
           <button
             key={preset.id}
             type="button"
-            className={`${secondaryButton} w-full justify-start text-left`}
+            className={secondaryButton}
             title={preset.details}
             onClick={() => onPick(preset)}
             onMouseEnter={() => setPreviewed(preset)}
@@ -36,16 +36,12 @@ export function PresetGallery({ onPick, onStartBlank }: PresetGalleryProps) {
             {preset.label}
           </button>
         ))}
-        <button
-          type="button"
-          className={`${secondaryButton} w-full justify-start text-left`}
-          onClick={onStartBlank}
-        >
+        <button type="button" className={secondaryButton} onClick={onStartBlank}>
           Start blank
         </button>
       </div>
       {previewed && (
-        <p className="rounded-md border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
+        <p className="max-w-3xl rounded-md border border-border bg-muted/50 p-3 text-xs text-muted-foreground">
           {previewed.details}
         </p>
       )}

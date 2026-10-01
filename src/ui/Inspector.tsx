@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 
 interface InspectorProps {
   title: string
@@ -7,8 +7,28 @@ interface InspectorProps {
   children: ReactNode
 }
 
-/** The right-side overlay panel: never modal, never resizes or re-fits the canvas it covers. */
+/** Auto-fit bounds, in CSS px: never shorter than a usable card, never most of the canvas. */
+const MIN_AUTO_HEIGHT = 240
+const MIN_DRAG_HEIGHT = 170
+/** Height used when the content cannot be measured (e.g. jsdom, before first paint). */
+const AUTO_HEIGHT_FALLBACK = 320
+/** The panel never grows past this share of the viewport. */
+const MAX_VIEWPORT_SHARE = 0.7
+
+function maxHeight(): number {
+  return window.innerHeight * MAX_VIEWPORT_SHARE
+}
+
+/**
+ * The full-width bottom panel: never modal, never resizes or re-fits the canvas
+ * it overlays. Its height auto-fits the content on open and on every change
+ * until the user drags the top edge, which takes over for the session.
+ */
 export function Inspector({ title, onClose, children }: InspectorProps) {
+  const panelRef = useRef<HTMLElement | null>(null)
+  const touchedRef = useRef(false)
+  const [height, setHeight] = useState<number | null>(null)
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
@@ -17,12 +37,57 @@ export function Inspector({ title, onClose, children }: InspectorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
+  useLayoutEffect(() => {
+    if (touchedRef.current) return
+    const panel = panelRef.current
+    if (!panel) return
+    panel.style.height = 'auto'
+    const measured = panel.scrollHeight || AUTO_HEIGHT_FALLBACK
+    const next = Math.round(Math.min(Math.max(measured, MIN_AUTO_HEIGHT), maxHeight()))
+    // Written straight to the DOM while the user has not taken over: the state
+    // only comes into play once the handle is dragged.
+    panel.style.height = `${next}px`
+  })
+
+  const startResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    touchedRef.current = true
+    const panel = panelRef.current
+    const startHeight = Math.round(
+      panel?.getBoundingClientRect().height ||
+        Number.parseFloat(panel?.style.height ?? '') ||
+        AUTO_HEIGHT_FALLBACK,
+    )
+    const startY = event.clientY
+
+    const handleMove = (moveEvent: globalThis.MouseEvent) => {
+      const next = startHeight + startY - moveEvent.clientY
+      setHeight(Math.round(Math.min(Math.max(next, MIN_DRAG_HEIGHT), maxHeight())))
+    }
+    const handleUp = () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+  }
+
   return (
     <aside
+      ref={panelRef}
       aria-label="Switch inspector"
-      className="absolute inset-y-0 right-0 z-10 flex w-[400px] max-w-full flex-col border-l border-border bg-card shadow-xl"
+      className="absolute inset-x-0 bottom-0 z-10 flex flex-col border-t border-border bg-card shadow-[0_-10px_26px_rgba(16,24,40,0.07)]"
+      style={{ height: height ?? undefined }}
     >
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div
+        role="separator"
+        aria-label="Resize panel"
+        aria-orientation="horizontal"
+        title="Drag to resize"
+        className="absolute -top-[3px] left-0 right-0 z-[3] h-[6px] cursor-row-resize"
+        onMouseDown={startResize}
+      />
+      <header className="flex items-center gap-2 border-b border-border px-4 py-2">
         <h2 className="mr-auto text-sm font-semibold">{title}</h2>
         <button
           type="button"
@@ -33,7 +98,7 @@ export function Inspector({ title, onClose, children }: InspectorProps) {
           ✕
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+      <div className="flex min-h-0 flex-1 overflow-auto p-4">{children}</div>
     </aside>
   )
 }

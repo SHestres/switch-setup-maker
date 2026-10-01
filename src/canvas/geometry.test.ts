@@ -1,48 +1,58 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Port, Row, Switch } from '@/model/types'
+import type { Port, Section, Switch } from '@/model/types'
 import { sampleDocument } from '@/test/fixtures'
 
 import { connectionCurve, portAnchor, wireCurve } from './geometry'
 
 /**
  * Expected coordinates below are worked examples derived by hand from the
- * faceplate's CSS/mirrored constants (portfield centring, bank gaps, row
- * heights), not from re-running the implementation.
+ * faceplate's CSS/mirrored constants (portfield centring, section gaps, row
+ * heights and per-section vertical centring), not from re-running the
+ * implementation.
  */
 
-function row(kind: Port['kind'], count: number, firstId = 1, speed: Port['speed'] = '1G'): Row {
+function section(
+  kind: Port['kind'],
+  rows: number,
+  columns: number,
+  firstId: number,
+  speed: Port['speed'] = '1G',
+  labels?: string[],
+): Section {
   return {
-    ports: Array.from({ length: count }, (_, index) => ({
+    kind,
+    speed,
+    rows,
+    columns,
+    numbering: 'sequential',
+    startMode: 'custom',
+    start: 1,
+    ports: Array.from({ length: rows * columns }, (_, index) => ({
       id: `p${firstId + index}`,
-      label: String(firstId + index),
+      label: labels?.[index] ?? String(firstId + index),
       kind,
       speed,
     })),
   }
 }
 
-function switchWith(rows: Row[], x = 0, y = 0): Switch {
-  return {
-    id: 'sw1',
-    name: '',
-    model: '',
+function switchWith(sections: Section[], x = 0, y = 0): Switch {
+  return { id: 'sw1', name: '', model: '', x, y, layout: { sections } }
+}
+
+/** The Unifi 48 Port shape: three 2×8 RJ45 sections then 2×2 SFP+ uplinks. */
+function denseSwitch(x = 0, y = 0): Switch {
+  return switchWith(
+    [
+      section('rj45', 2, 8, 1),
+      section('rj45', 2, 8, 17),
+      section('rj45', 2, 8, 33, '2.5G'),
+      section('sfp+', 2, 2, 49, '10G'),
+    ],
     x,
     y,
-    // One one-row Section per faceplate row keeps the flat row list identical.
-    layout: {
-      sections: rows.map((row) => ({
-        kind: row.ports[0]?.kind ?? 'rj45',
-        speed: row.ports[0]?.speed ?? '1G',
-        rows: 1,
-        columns: row.ports.length,
-        numbering: 'sequential' as const,
-        startMode: 'custom' as const,
-        start: 1,
-        ports: row.ports,
-      })),
-    },
-  }
+  )
 }
 
 /** The lowest point of a cubic SVG path, sampled densely (test-side truth). */
@@ -60,74 +70,76 @@ function deepestPoint(d: string): { x: number; y: number } {
 }
 
 describe('portAnchor', () => {
-  it('centres a main-bank port and an uplink-cage port on a simple faceplate', () => {
-    // Face "Core": one 2-port main row + one SFP uplink row on the right.
-    // Main bank 54 wide, uplink 27, gap 8 -> 89 total; portfield spans x+38..x+802,
-    // so the group starts at x + 38 + (764 - 89) / 2 = x + 375.5.
-    // Main bank height 33 -> top y + 28; row top +9; tile centre +12.
-    // Uplink bank height 22 -> top y + 33.5; tile centre +11.
-    const switch_ = switchWith([row('rj45', 2), row('sfp+', 1, 49, '10G')], 120, 360)
+  it('lays same-kind Sections left to right 6px apart, each centred vertically', () => {
+    // Two 2×2 RJ45 Sections: widths 54 + 54 with one 6px gap = 114.
+    // portfield spans x+38..x+802, so the group starts at 38 + (764 - 114) / 2 = 363.
+    // Both Sections are 66 high against the 77 chassis field, so top = 6 + 5.5 = 11.5.
+    // Row tops +9 and +33; tile centres +12 -> 32.5 and 56.5.
+    const switch_ = switchWith([section('rj45', 2, 2, 1), section('rj45', 2, 2, 5)], 10, 20)
 
-    expect(portAnchor(switch_, 'p1')).toEqual({ x: 509, y: 409 })
-    expect(portAnchor(switch_, 'p2')).toEqual({ x: 536, y: 409 })
-    expect(portAnchor(switch_, 'p49')).toEqual({ x: 571, y: 404.5 })
+    expect(portAnchor(switch_, 'p1')).toEqual({ x: 386.5, y: 52.5 })
+    expect(portAnchor(switch_, 'p4')).toEqual({ x: 413.5, y: 76.5 })
+    // The second Section starts after 54 + 6 and centres on the same rows.
+    expect(portAnchor(switch_, 'p5')).toEqual({ x: 446.5, y: 52.5 })
+    expect(portAnchor(switch_, 'p6')).toEqual({ x: 473.5, y: 52.5 })
   })
 
-  it('lays out a dense 48-port faceplate (24+24 main, 4 uplinks right)', () => {
-    // The Unifi 48 Port preset: main 648 wide, uplink 108, gap 8 -> exactly 764,
-    // so there is no centring slack and the uplink bank starts at x + 694.
-    // Main bank height 66 -> top y + 11.5; row 0 top +9, row 1 top +33.
-    // Uplink bank height 22 -> top y + 33.5; tile centre +11.
+  it('separates neighbouring Sections of different kinds by 16px', () => {
+    // 1×2 RJ45 (54) then 1×1 SFP+ (27) with a 16px gap = 97; the group starts
+    // at 38 + (764 - 97) / 2 = 371.5. One-row Sections are 33 high and centre
+    // inside the 77 field: top 28, row top 9, tile centre 49.
     const switch_ = switchWith(
-      [row('rj45', 24), row('rj45', 24, 25), row('sfp+', 4, 49, '10G')],
-      100,
-      50,
+      [section('rj45', 1, 2, 1), section('sfp+', 1, 1, 49, '10G')],
+      120,
+      360,
     )
 
-    expect(portAnchor(switch_, 'p1')).toEqual({ x: 151.5, y: 82.5 })
-    expect(portAnchor(switch_, 'p24')).toEqual({ x: 772.5, y: 82.5 })
-    expect(portAnchor(switch_, 'p25')).toEqual({ x: 151.5, y: 106.5 })
-    expect(portAnchor(switch_, 'p48')).toEqual({ x: 772.5, y: 106.5 })
-    expect(portAnchor(switch_, 'p49')).toEqual({ x: 807.5, y: 94.5 })
-    expect(portAnchor(switch_, 'p52')).toEqual({ x: 888.5, y: 94.5 })
+    expect(portAnchor(switch_, 'p1')).toEqual({ x: 505, y: 409 })
+    expect(portAnchor(switch_, 'p2')).toEqual({ x: 532, y: 409 })
+    expect(portAnchor(switch_, 'p49')).toEqual({ x: 575, y: 409 })
   })
 
-  it('places a leading uplink bank on the left of the main field', () => {
-    // Left bank 54, main 54 (no right bank) -> 116 total with one 8 gap;
-    // group starts at 38 + (764 - 116) / 2 = 362. Main field starts at 424.
-    // Left cages: 22 + 4 + 22 = 48 high, centred in 77 -> top +20.5.
-    const switch_ = switchWith([row('sfp', 2, 1), row('sfp', 2, 3), row('rj45', 2, 5)])
+  it('centres a short Section against a tall neighbour', () => {
+    // 4-row RJ45 (132 high) then 2-row SFP+ (66 high): the field grows to 132,
+    // the tall Section sits at the top (y + 6) and the short one at
+    // 6 + (132 - 66) / 2 = 39. Group: 27 + 16 + 27 = 70 wide, starting at 385.
+    const switch_ = switchWith([section('rj45', 4, 1, 1), section('sfp+', 2, 1, 5, '10G')])
 
-    expect(portAnchor(switch_, 'p1')).toEqual({ x: 375.5, y: 31.5 })
-    expect(portAnchor(switch_, 'p3')).toEqual({ x: 375.5, y: 57.5 })
-    expect(portAnchor(switch_, 'p5')).toEqual({ x: 437.5, y: 49 })
-    expect(portAnchor(switch_, 'p6')).toEqual({ x: 464.5, y: 49 })
+    expect(portAnchor(switch_, 'p1')).toEqual({ x: 398.5, y: 27 })
+    expect(portAnchor(switch_, 'p4')).toEqual({ x: 398.5, y: 117 })
+    expect(portAnchor(switch_, 'p5')).toEqual({ x: 441.5, y: 60 })
+    expect(portAnchor(switch_, 'p6')).toEqual({ x: 441.5, y: 84 })
   })
 
-  it('grows the faceplate and re-centres banks when the rows exceed the chassis height', () => {
-    // Four single-port rows: two full 66-high pairs (132) beat the 77 chassis
-    // field, so the face grows and the bank starts at the padding (y + 6).
-    const switch_ = switchWith(
-      [row('rj45', 1, 1), row('rj45', 1, 2), row('rj45', 1, 3), row('rj45', 1, 4)],
-      10,
-      20,
-    )
+  it('lays out a dense 48-port faceplate (3×2×8 RJ45, 4 SFP+)', () => {
+    // Widths 216 + 216 + 216 + 54, gaps 6 + 6 + 16 = 730; the 764 field leaves
+    // 17px slack each side, so the group starts at x + 55. All Sections are 66
+    // high, top y + 11.5, row centres y + 32.5 / y + 56.5.
+    const switch_ = denseSwitch(100, 50)
+
+    expect(portAnchor(switch_, 'p1')).toEqual({ x: 168.5, y: 82.5 })
+    expect(portAnchor(switch_, 'p16')).toEqual({ x: 357.5, y: 106.5 })
+    expect(portAnchor(switch_, 'p17')).toEqual({ x: 390.5, y: 82.5 })
+    expect(portAnchor(switch_, 'p32')).toEqual({ x: 579.5, y: 106.5 })
+    expect(portAnchor(switch_, 'p33')).toEqual({ x: 612.5, y: 82.5 })
+    expect(portAnchor(switch_, 'p48')).toEqual({ x: 801.5, y: 106.5 })
+    expect(portAnchor(switch_, 'p49')).toEqual({ x: 844.5, y: 82.5 })
+    expect(portAnchor(switch_, 'p50')).toEqual({ x: 871.5, y: 82.5 })
+    expect(portAnchor(switch_, 'p51')).toEqual({ x: 844.5, y: 106.5 })
+  })
+
+  it('grows the faceplate when a Section exceeds the chassis height', () => {
+    // A single 6-row Section: three 66-high pairs = 198, so the field grows to
+    // 198 (face 210) and the Section top sits at y + 6. Row 5's top is
+    // 2*66 + 9 + 24 = 165, its tile centre y + 183.
+    const switch_ = switchWith([section('rj45', 6, 1, 1)], 10, 20)
 
     expect(portAnchor(switch_, 'p1')).toEqual({ x: 430, y: 47 })
-    expect(portAnchor(switch_, 'p2')).toEqual({ x: 430, y: 71 })
-    expect(portAnchor(switch_, 'p3')).toEqual({ x: 430, y: 113 })
-    expect(portAnchor(switch_, 'p4')).toEqual({ x: 430, y: 137 })
-  })
-
-  it('keeps an all-uplink layout on the main field with printed label rows', () => {
-    const switch_ = switchWith([row('sfp', 1, 1), row('sfp+', 1, 2, '10G')])
-
-    expect(portAnchor(switch_, 'p1')).toEqual({ x: 420, y: 32.5 })
-    expect(portAnchor(switch_, 'p2')).toEqual({ x: 420, y: 56.5 })
+    expect(portAnchor(switch_, 'p6')).toEqual({ x: 430, y: 203 })
   })
 
   it('returns undefined for a port the switch does not have', () => {
-    const switch_ = switchWith([row('rj45', 1)])
+    const switch_ = switchWith([section('rj45', 1, 1, 1)])
 
     expect(portAnchor(switch_, 'nope')).toBeUndefined()
   })
@@ -161,8 +173,8 @@ describe('wireCurve', () => {
   })
 
   it('formats half-unit coordinates without floating-point noise', () => {
-    expect(wireCurve({ x: 389, y: 409 }, { x: 1073.5, y: 449 })).toBe(
-      'M 389 409 C 389 429, 1073.5 429, 1073.5 449',
+    expect(wireCurve({ x: 385, y: 409 }, { x: 1073.5, y: 449 })).toBe(
+      'M 385 409 C 385 429, 1073.5 429, 1073.5 449',
     )
   })
 })
@@ -171,9 +183,9 @@ describe('connectionCurve', () => {
   it('draws a restored cross-switch connection between the two port anchors', () => {
     const setup = sampleDocument().setup
 
-    // sw1.p1 = (120 + 389, 360 + 49), sw2.p2 = (640 + 406.5 + 27, 400 + 49).
+    // sw1.p1 = (120 + 385, 360 + 49), sw2.p2 = (640 + 433.5, 400 + 49).
     expect(connectionCurve(setup, setup.connections[0])).toBe(
-      'M 509 409 C 509 429, 1073.5 429, 1073.5 449',
+      'M 505 409 C 505 429, 1073.5 429, 1073.5 449',
     )
   })
 
@@ -188,27 +200,21 @@ describe('connectionCurve', () => {
         a: { switch: 'sw1', port: 'p1' },
         b: { switch: 'sw1', port: 'p2' },
       }),
-    ).toBe('M 509 409 C 509 473, 536 473, 536 409')
+    ).toBe('M 505 409 C 505 473, 532 473, 532 409')
   })
 
   it('keeps adjacent SFP+ uplinks clickable under a dense 48-port face', () => {
-    // The Unifi 48 Port preset: 24+24 main, 4 SFP+ right; uplink bank height
-    // 22 -> face height 89, bottom at y + 89. p49/p50 anchors sit at
-    // (807.5, 94.5) and (834.5, 94.5) on a switch at (100, 50); their dip
-    // must reach 139 + 8: bow (147 - 94.5) / 0.75 = 70.
-    const switch_ = switchWith(
-      [row('rj45', 24), row('rj45', 24, 25), row('sfp+', 4, 49, '10G')],
-      100,
-      50,
-    )
-    const setup = { switches: [switch_], connections: [] }
+    // The Unifi 48 Port shape: the SFP+ Section's p49/p50 anchors sit at
+    // (844.5, 82.5) and (871.5, 82.5) on a switch at (100, 50); their dip
+    // must reach 139 + 8: bow (147 - 82.5) / 0.75 = 86.
+    const setup = { switches: [denseSwitch(100, 50)], connections: [] }
 
     expect(
       connectionCurve(setup, {
         a: { switch: 'sw1', port: 'p49' },
         b: { switch: 'sw1', port: 'p50' },
       }),
-    ).toBe('M 807.5 94.5 C 807.5 164.5, 834.5 164.5, 834.5 94.5')
+    ).toBe('M 844.5 82.5 C 844.5 168.5, 871.5 168.5, 871.5 82.5')
   })
 
   it('dips a level cross-switch cable below both overlapping faceplates', () => {
@@ -216,43 +222,39 @@ describe('connectionCurve', () => {
     setup.switches[1].x = 160
     setup.switches[1].y = 360
 
-    // sw2.p1 = (160 + 393 + 13.5, 360 + 49); both 89-high faces (bottom 449)
+    // sw2.p1 = (160 + 406.5, 360 + 49); both 89-high faces (bottom 449)
     // cover the level span, so the dip must reach 457: bow 64.
     expect(
       connectionCurve(setup, {
         a: { switch: 'sw1', port: 'p1' },
         b: { switch: 'sw2', port: 'p1' },
       }),
-    ).toBe('M 509 409 C 509 473, 566.5 473, 566.5 409')
+    ).toBe('M 505 409 C 505 473, 566.5 473, 566.5 409')
   })
 
   it('leaves a level cross-switch cable alone when its dip already clears both faces', () => {
     const setup = sampleDocument().setup
     setup.switches[1].y = 360
 
-    // 537.5 apart on the same level: the base span sag already reaches
+    // 541.5 apart on the same level: the base span sag already reaches
     // 409 + 0.75 * 120 = 499, well clear of the 449 faces, so the style stays.
     expect(
       connectionCurve(setup, {
         a: { switch: 'sw1', port: 'p1' },
         b: { switch: 'sw2', port: 'p1' },
       }),
-    ).toBe('M 509 409 C 509 529, 1046.5 529, 1046.5 409')
+    ).toBe('M 505 409 C 505 529, 1046.5 529, 1046.5 409')
   })
 
   it('keeps every adjacent pair on a dense face clear of the chassis', () => {
-    // Unifi 48 Port density: 24+24 main, 4 SFP+ right. Face height 89 (bottom
-    // 50 + 89 = 139); every wired neighbour's deepest point must clear it by 8.
-    const switch_ = switchWith(
-      [row('rj45', 24), row('rj45', 24, 25), row('sfp+', 4, 49, '10G')],
-      100,
-      50,
-    )
-    const setup = { switches: [switch_], connections: [] }
+    // Unifi 48 Port density. Face height 89 (bottom 50 + 89 = 139); every
+    // wired neighbour's deepest point must clear it by 8.
+    const setup = { switches: [denseSwitch(100, 50)], connections: [] }
     const pairs: Array<[number, number]> = []
-    for (let port = 1; port < 24; port++) pairs.push([port, port + 1])
-    for (let port = 25; port < 48; port++) pairs.push([port, port + 1])
-    pairs.push([49, 50], [50, 51], [51, 52], [1, 25], [24, 48], [1, 49], [24, 52])
+    for (let port = 1; port < 16; port++) pairs.push([port, port + 1])
+    for (let port = 17; port < 32; port++) pairs.push([port, port + 1])
+    for (let port = 33; port < 48; port++) pairs.push([port, port + 1])
+    pairs.push([49, 50], [50, 51], [51, 52], [16, 17], [32, 33], [1, 49], [48, 52])
 
     for (const [from, to] of pairs) {
       const d = connectionCurve(setup, {
@@ -290,12 +292,12 @@ describe('connectionCurve', () => {
     const setup = sampleDocument().setup
     const connection = setup.connections[0]
 
-    // Core's p1 anchor sits at (509, 409). Moving the switch 100 down puts it
-    // at (509, 509); Edge's p2 at (1073.5, 449) is now clearly above, so the
+    // Core's p1 anchor sits at (505, 409). Moving the switch 100 down puts it
+    // at (505, 509); Edge's p2 at (1073.5, 449) is now clearly above, so the
     // exit flips to a mirrored S while the other end stays put.
     expect(connectionCurve(setup, connection, { id: 'sw1', x: 120, y: 460 })).toBe(
-      'M 509 509 C 509 479, 1073.5 479, 1073.5 449',
+      'M 505 509 C 505 479, 1073.5 479, 1073.5 449',
     )
-    expect(connectionCurve(setup, connection)).toBe('M 509 409 C 509 429, 1073.5 429, 1073.5 449')
+    expect(connectionCurve(setup, connection)).toBe('M 505 409 C 505 429, 1073.5 429, 1073.5 449')
   })
 })

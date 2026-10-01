@@ -1,11 +1,11 @@
 import { Fragment } from 'react'
 import type { MouseEvent } from 'react'
 
-import { sectionRows } from '@/model/layout'
 import { switchLabel } from '@/model/document'
-import type { Port, PortRef, Row, Switch } from '@/model/types'
+import { sectionRows } from '@/model/layout'
+import type { Port, PortRef, Row, Section, Switch } from '@/model/types'
 
-import { bankLabel, portAriaLabel, splitBanks } from './faceplateLayout'
+import { portAriaLabel } from './faceplateLayout'
 import { portKey } from './portRef'
 
 export interface FaceplateProps {
@@ -24,7 +24,7 @@ export interface FaceplateProps {
   onPortClick?: (ref: PortRef) => void
 }
 
-/** A switch rendered as a rack-width faceplate: rows of ports with printed labels. */
+/** A switch rendered as a rack-width faceplate: Sections left to right, with printed labels. */
 export function Faceplate({
   switch_,
   x,
@@ -37,7 +37,7 @@ export function Faceplate({
   onClick,
   onPortClick,
 }: FaceplateProps) {
-  const banks = splitBanks(switch_.layout.sections.flatMap(sectionRows))
+  const { sections } = switch_.layout
   const name = switchLabel(switch_)
 
   return (
@@ -71,37 +71,25 @@ export function Faceplate({
           </span>
         </div>
         <div className="portfield">
-          {banks.left.length > 0 && (
-            <UplinkBank
-              rows={banks.left}
-              switchId={switch_.id}
-              switchName={name}
-              ghost={ghost}
-              connectedPorts={connectedPorts}
-              pendingPortId={pendingPortId}
-              onPortClick={onPortClick}
-            />
-          )}
-          <MainBank
-            rows={banks.main}
-            switchId={switch_.id}
-            switchName={name}
-            ghost={ghost}
-            connectedPorts={connectedPorts}
-            pendingPortId={pendingPortId}
-            onPortClick={onPortClick}
-          />
-          {banks.right.length > 0 && (
-            <UplinkBank
-              rows={banks.right}
-              switchId={switch_.id}
-              switchName={name}
-              ghost={ghost}
-              connectedPorts={connectedPorts}
-              pendingPortId={pendingPortId}
-              onPortClick={onPortClick}
-            />
-          )}
+          {sections.map((section, index) => {
+            const tight = index > 0 && sections[index - 1].kind === section.kind
+            return (
+              <Fragment key={index}>
+                {index > 0 && (
+                  <span className={tight ? 'sec-gap tight' : 'sec-gap'} aria-hidden="true" />
+                )}
+                <SectionView
+                  section={section}
+                  switchId={switch_.id}
+                  switchName={name}
+                  ghost={ghost}
+                  connectedPorts={connectedPorts}
+                  pendingPortId={pendingPortId}
+                  onPortClick={onPortClick}
+                />
+              </Fragment>
+            )
+          })}
         </div>
         <div className="chrome right">
           {switch_.model && <span className="model">{switch_.model}</span>}
@@ -116,8 +104,8 @@ export function Faceplate({
   )
 }
 
-interface BankProps {
-  rows: readonly Row[]
+interface SectionProps {
+  section: Section
   switchId: string
   switchName: string
   ghost?: boolean
@@ -126,18 +114,18 @@ interface BankProps {
   onPortClick?: (ref: PortRef) => void
 }
 
-function MainBank({
-  rows,
+function SectionView({
+  section,
   switchId,
   switchName,
   ghost,
   connectedPorts,
   pendingPortId,
   onPortClick,
-}: BankProps) {
+}: SectionProps) {
   return (
-    <div className="bank main">
-      {pairRows(rows).map(([top, bottom], index) => (
+    <div className="section">
+      {pairRows(sectionRows(section)).map(([top, bottom], index) => (
         <Fragment key={index}>
           <LabelRow row={top} />
           <PortRow
@@ -157,6 +145,7 @@ function MainBank({
                 switchName={switchName}
                 ghost={ghost}
                 connectedPorts={connectedPorts}
+                pendingPortId={pendingPortId}
                 onPortClick={onPortClick}
               />
               <LabelRow row={bottom} />
@@ -164,36 +153,6 @@ function MainBank({
           )}
         </Fragment>
       ))}
-    </div>
-  )
-}
-
-function UplinkBank({
-  rows,
-  switchId,
-  switchName,
-  ghost,
-  connectedPorts,
-  pendingPortId,
-  onPortClick,
-}: BankProps) {
-  return (
-    <div className="bank uplink">
-      <span className="bank-label">{bankLabel(rows)}</span>
-      <div className="cages">
-        {rows.map((row, index) => (
-          <PortRow
-            key={index}
-            row={row}
-            switchId={switchId}
-            switchName={switchName}
-            ghost={ghost}
-            connectedPorts={connectedPorts}
-            pendingPortId={pendingPortId}
-            onPortClick={onPortClick}
-          />
-        ))}
-      </div>
     </div>
   )
 }
@@ -258,7 +217,6 @@ function PortButton({
   const isCage = port.kind !== 'rj45'
   const content = (
     <>
-      {isCage && <span className="cage-num">{port.label}</span>}
       <span className="led" />
       <span className="jack" />
       {isCage && <span className="latch" />}

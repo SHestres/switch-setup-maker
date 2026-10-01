@@ -30,9 +30,7 @@ export const FACE_PADDING_Y = 5
 export const CHROME_LEFT_WIDTH = 34
 /** Fixed `.chrome.right` column width in canvas units. */
 export const CHROME_RIGHT_WIDTH = 74
-/** `.portfield` gap between banks in canvas units. */
-export const BANK_GAP = 8
-/** Height of one `.cages .row` in canvas units. */
-export const CAGE_ROW_HEIGHT = 22
-/** `.cages` gap between uplink rows in canvas units. */
-export const CAGE_GAP = 4
+/** Gap between neighbouring Sections of the same Port kind in canvas units. */
+export const SECTION_GAP_SAME_KIND = 6
+/** Gap between neighbouring Sections of different Port kinds in canvas units. */
+export const SECTION_GAP_OTHER_KIND = 16
