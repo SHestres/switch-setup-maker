@@ -52,15 +52,12 @@ A hosted, self-hostable web app that lets IT pros model network switch setups. T
 The fog beyond the MVP — all in scope for this journey, none yet sharp enough to ticket:
 
 - **Port-diagram exports (CSV/Excel)** — what a "port diagram" export contains; per-switch sheet vs. global connection list; format conventions.
-- **Cable metadata** — palette, selection UI, defaults, types and lengths. Seam settled by [05](issues/05-domain-model.md): attributes ride on the connection and live in the setup (colour is semantic), never in `ui`.
 - **Inventory** — counting SFP adapters and cables by length; what rules drive the counts; whether a stock/SKU notion is needed.
-- **Port speed & PoE highlighting** — per-port speeds and PoE budgets; the visual language for highlighting.
 - **Speed-mismatch warnings** — which combinations warn (1G↔10G, SFP vs RJ45, autoneg nuances).
 - **Spanning tree / loops** — cycle detection in the connection graph; how loops are surfaced; multiple links between switches.
 - **Connection state colours** — the port/cable colour language beyond link-state: needing an adapter, speed mismatch, aggregation (LAG), loop membership, layered over link state; what the model and cable metadata must carry for each (extends the speed/PoE and loop bullets above).
 - **Multiple setups library** — create/name/switch between setups.
 - **Device types** — servers, access points, firewalls, … as a future extension of the port-device work; the current scope (tickets [29](issues/29-port-devices-model-and-editing.md)–[30](issues/30-port-hover-connected-info.md)) is generic and named devices only.
-- **Real device-model library** — pick actual hardware models with pre-baked layouts.
 - **Undo/redo** and other editing conveniences.
 - **Post-MVP test hardening / TDD push** — the user wants a heavy test suite once the idea is validated.
 - Plus whatever the "maybe more" turns out to be.
