@@ -4,7 +4,7 @@ Type: map
 
 ## Destination
 
-A hosted, self-hostable web app that lets IT pros model network switch setups. The journey starts with a working MVP — add switches, configure their port layouts, draw port-to-port connections, autosave, JSON import/export — and continues through the long-term feature set: port-diagram exports (CSV/Excel), custom cable colors, cable/SFP inventory counts, port speed & PoE highlighting, speed-mismatch warnings, and spanning-tree/loop checks.
+A hosted, self-hostable web app that lets IT pros model network switch setups. The journey starts with a working MVP — add switches, configure their port layouts, draw port-to-port connections, autosave, JSON import/export — and continues through the long-term feature set: port devices (generic and named) with what-a-port-is-connected-to inspection, port-diagram exports (CSV/Excel), custom cable colors, cable/SFP inventory counts, port speed & PoE highlighting, speed-mismatch warnings, and spanning-tree/loop checks.
 
 ## Notes
 
@@ -59,6 +59,7 @@ The fog beyond the MVP — all in scope for this journey, none yet sharp enough 
 - **Spanning tree / loops** — cycle detection in the connection graph; how loops are surfaced; multiple links between switches.
 - **Connection state colours** — the port/cable colour language beyond link-state: needing an adapter, speed mismatch, aggregation (LAG), loop membership, layered over link state; what the model and cable metadata must carry for each (extends the speed/PoE and loop bullets above).
 - **Multiple setups library** — create/name/switch between setups.
+- **Device types** — servers, access points, firewalls, … as a future extension of the port-device work; the current scope (tickets [29](issues/29-port-devices-model-and-editing.md)–[30](issues/30-port-hover-connected-info.md)) is generic and named devices only.
 - **Real device-model library** — pick actual hardware models with pre-baked layouts.
 - **Undo/redo** and other editing conveniences.
 - **Post-MVP test hardening / TDD push** — the user wants a heavy test suite once the idea is validated.
