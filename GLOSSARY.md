@@ -36,8 +36,12 @@ _Avoid_: Port map, configuration
 A horizontal group of ports as laid out on a faceplate.
 _Avoid_: Line, bank
 
+**Section**:
+A vertically-centred bank of ports on a faceplate: a grid of rows and columns sharing a port kind, speed, numbering convention and starting number. Sections line up left to right; same-kind neighbours sit closer together than different kinds.
+_Avoid_: Bank, group
+
 **Port numbering preset**:
-The convention that generates printed port labels: odd-top/even-bottom, sequential, even-top-zero-based, or custom.
+The convention that generates printed port labels, set per section: alternating top-first, alternating bottom-first, or sequential; each section starts numbering automatically after the previous section or at a custom number.
 _Avoid_: Scheme, mode
 
 **Layout preset**:

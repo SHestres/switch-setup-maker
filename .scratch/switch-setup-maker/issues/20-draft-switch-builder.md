@@ -27,3 +27,5 @@ Evidence (branch `ticket/20-draft-builder`, worktree `/tmp/opencode/ssm-worktree
 - Commit: stored layout asserted exactly and independently (`sequential`, four ports `p1..p4` labelled 1–4), position `{ x: 160, y: 355.5 }` from the placement rule, new switch selected, ghost gone.
 - Silent discard covered on ✕, Esc and empty-canvas click; confirmed discard covers dialog copy, cancel-keeps and discard-removes; gallery and switch-selection hand-over covered too.
 - `npm run build`, `npm run lint` and prettier check green. Canvas diff kept minimal and additive for ticket 21.
+
+Superseded by [27](27-section-faceplate-and-editor.md) — the row editor is replaced by the section editor.

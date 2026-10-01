@@ -47,3 +47,5 @@ A multi-stage Dockerfile: Node builds the app, a minimal static server serves `d
 There is no container runtime here (`command -v docker podman nerdctl` → none), so `docker build` and `docker run` were **not executed**. The Dockerfile is correct by construction and validated as far as the environment allows: every command it runs (`npm ci`, `npm run build`, `node scripts/serve.mjs` with `HOST`/`PORT`) was executed locally against the production build, the runtime image contents were simulated exactly, and the syntax was linted. A `docker build && docker run -p 8080:8080` smoke test remains for a machine with a container runtime (acceptance box left `[~]`).
 
 The `npx serve dist` alternative in the README is documented as an example of "any static server"; the bundled server was the executed path.
+
+Docker `build`/`run` verification remains owed as of the [28](28-mvp-pre-merge-edits.md) pre-merge batch (no Docker runtime in the dev environment); the `[~]` acceptance box stays for a Docker-capable machine.

@@ -54,3 +54,5 @@ Built the full layout editor, all exercised through `<App />`.
 - The last row cannot be removed and counts cannot be lowered below 1; `custom` numbering stays read-only in v1 as specified.
 - `new row` defaults to 12×RJ45 1G (half of the common 2×12 arrangement) — not pinned by the spec; ticket 20 can adjust the draft's default row.
 - The number preset select maps to human labels ("Odd top / even bottom", "Sequential", "Even top / zero-based").
+
+Superseded by [27](27-section-faceplate-and-editor.md) — the row editor is replaced by the section editor.
