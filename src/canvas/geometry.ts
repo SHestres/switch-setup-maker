@@ -1,11 +1,7 @@
 import { findSwitch } from '@/model/document'
-import { sectionRows } from '@/model/layout'
-import type { Connection, PortRef, Row, Setup, Switch } from '@/model/types'
+import type { Connection, PortRef, Section, Setup, Switch } from '@/model/types'
 
 import {
-  BANK_GAP,
-  CAGE_GAP,
-  CAGE_ROW_HEIGHT,
   CHROME_LEFT_WIDTH,
   CHROME_RIGHT_WIDTH,
   FACE_BORDER,
@@ -16,13 +12,14 @@ import {
   PORT_PITCH,
   RACK_WIDTH,
   ROW_HEIGHT,
+  SECTION_GAP_OTHER_KIND,
+  SECTION_GAP_SAME_KIND,
 } from './constants'
-import { splitBanks } from './faceplateLayout'
 
 /**
  * Model-first port and wire geometry (ADR 0001): every coordinate is derived
  * from the port grid and the renderer constants, never from DOM measurement.
- * `faceplate.css` renders the same grid with flex rows; the constants mirror it.
+ * `faceplate.css` renders the same grid with flex sections; the constants mirror it.
  */
 
 /** A point in canvas units, relative to the canvas origin (switch x/y share it). */
@@ -58,37 +55,36 @@ const SAG_LOWEST_SHARE = 0.75
  */
 const SAG_CLEARANCE = 8
 
-interface FaceplateBank {
-  rows: readonly Row[]
-  /** Distance between the bank's top and the face content's top. */
-  top: number
+interface PlacedSection {
+  section: Section
+  /** Distance between the Section's left edge and the face content's left. */
   left: number
+  /** Distance between the Section's top and the face content's top. */
+  top: number
   width: number
   height: number
-  /** Vertical distance from the bank top to the row's top. */
-  rowTop: (index: number) => number
-  rowHeight: number
 }
 
-function bankWidth(rows: readonly Row[]): number {
-  return rows.reduce((widest, row) => Math.max(widest, row.ports.length), 0) * PORT_PITCH
+function sectionWidth(section: Section): number {
+  return section.columns * PORT_PITCH
 }
 
-/** A main-field pair is label + top row + bottom row + label; a lone row is label + row. */
-function mainBankHeight(rows: readonly Row[]): number {
-  const pairs = Math.floor(rows.length / 2)
+/** A row-pair is label + top row + bottom row + label; a lone row is label + row. */
+function sectionHeight(section: Section): number {
+  const pairs = Math.floor(section.rows / 2)
   return (
     pairs * 2 * (LABEL_ROW_HEIGHT + ROW_HEIGHT) +
-    (rows.length % 2) * (LABEL_ROW_HEIGHT + ROW_HEIGHT)
+    (section.rows % 2) * (LABEL_ROW_HEIGHT + ROW_HEIGHT)
   )
 }
 
-/** The face content's rendered height: the chassis field, or the tallest bank when it overflows. */
-function faceContentHeight(...bankHeights: number[]): number {
-  return Math.max(FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y, ...bankHeights)
+/** The face content's rendered height: the chassis field, or the tallest Section when it overflows. */
+function faceContentHeight(...sectionHeights: number[]): number {
+  return Math.max(FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y, ...sectionHeights)
 }
 
-function mainRowTop(index: number): number {
+/** Vertical distance from a Section's top to the row's top. */
+function sectionRowTop(index: number): number {
   return (
     Math.floor(index / 2) * 2 * (LABEL_ROW_HEIGHT + ROW_HEIGHT) +
     LABEL_ROW_HEIGHT +
@@ -96,69 +92,42 @@ function mainRowTop(index: number): number {
   )
 }
 
-function uplinkBankHeight(rows: readonly Row[]): number {
-  if (rows.length === 0) return 0
-  return rows.length * CAGE_ROW_HEIGHT + (rows.length - 1) * CAGE_GAP
-}
-
-function uplinkRowTop(index: number): number {
-  return index * (CAGE_ROW_HEIGHT + CAGE_GAP)
-}
-
-/** The banks a faceplate renders, with their vertical/horizontal placement. */
-function placedBanks(switch_: Switch): FaceplateBank[] {
-  const { main, left, right } = splitBanks(switch_.layout.sections.flatMap(sectionRows))
+/**
+ * The Sections' horizontal placement: left to right from the portfield's
+ * centre, with 6px between same-kind neighbours and 16px otherwise. Each
+ * Section is centred vertically against the tallest one (or the chassis).
+ */
+function placedSections(switch_: Switch): PlacedSection[] {
+  const { sections } = switch_.layout
   const portfieldLeft = FACE_BORDER + FACE_PADDING_X + CHROME_LEFT_WIDTH
   const portfieldWidth =
     RACK_WIDTH - 2 * FACE_BORDER - 2 * FACE_PADDING_X - CHROME_LEFT_WIDTH - CHROME_RIGHT_WIDTH
 
-  const banks: FaceplateBank[] = []
-  if (left.length > 0) {
-    banks.push({
-      rows: left,
-      top: 0,
-      left: 0,
-      width: bankWidth(left),
-      height: uplinkBankHeight(left),
-      rowTop: uplinkRowTop,
-      rowHeight: CAGE_ROW_HEIGHT,
-    })
-  }
-  if (main.length > 0) {
-    banks.push({
-      rows: main,
-      top: 0,
-      left: 0,
-      width: bankWidth(main),
-      height: mainBankHeight(main),
-      rowTop: mainRowTop,
-      rowHeight: ROW_HEIGHT,
-    })
-  }
-  if (right.length > 0) {
-    banks.push({
-      rows: right,
-      top: 0,
-      left: 0,
-      width: bankWidth(right),
-      height: uplinkBankHeight(right),
-      rowTop: uplinkRowTop,
-      rowHeight: CAGE_ROW_HEIGHT,
-    })
+  const gapBefore = (index: number): number => {
+    if (index === 0) return 0
+    return sections[index - 1].kind === sections[index].kind
+      ? SECTION_GAP_SAME_KIND
+      : SECTION_GAP_OTHER_KIND
   }
 
-  const gap = banks.length > 1 ? BANK_GAP * (banks.length - 1) : 0
-  const contentWidth = banks.reduce((total, bank) => total + bank.width, 0) + gap
-  const contentHeight = faceContentHeight(...banks.map((bank) => bank.height))
+  const widths = sections.map(sectionWidth)
+  const contentWidth = widths.reduce((total, width, index) => total + width + gapBefore(index), 0)
+  const contentHeight = faceContentHeight(...sections.map(sectionHeight))
 
-  // The portfield centres the rendered banks; so does the group's top padding.
   let cursor = portfieldLeft + (portfieldWidth - contentWidth) / 2
-  for (const bank of banks) {
-    bank.left = cursor
-    bank.top = FACE_BORDER + FACE_PADDING_Y + (contentHeight - bank.height) / 2
-    cursor += bank.width + BANK_GAP
-  }
-  return banks
+  return sections.map((section, index) => {
+    cursor += gapBefore(index)
+    const height = sectionHeight(section)
+    const placed: PlacedSection = {
+      section,
+      left: cursor,
+      top: FACE_BORDER + FACE_PADDING_Y + (contentHeight - height) / 2,
+      width: widths[index],
+      height,
+    }
+    cursor += placed.width
+    return placed
+  })
 }
 
 /** Where a port's tile centre sits in canvas coordinates, or undefined if absent. */
@@ -168,14 +137,14 @@ export function portAnchor(
   moved?: MovedSwitch | null,
 ): Point | undefined {
   const origin = moved?.id === switch_.id ? moved : switch_
-  for (const bank of placedBanks(switch_)) {
-    for (let index = 0; index < bank.rows.length; index++) {
-      const column = bank.rows[index].ports.findIndex((port) => port.id === portId)
-      if (column === -1) continue
-      return {
-        x: origin.x + bank.left + column * PORT_PITCH + PORT_PITCH / 2,
-        y: origin.y + bank.top + bank.rowTop(index) + bank.rowHeight / 2,
-      }
+  for (const placed of placedSections(switch_)) {
+    const index = placed.section.ports.findIndex((port) => port.id === portId)
+    if (index === -1) continue
+    const row = Math.floor(index / placed.section.columns)
+    const column = index % placed.section.columns
+    return {
+      x: origin.x + placed.left + column * PORT_PITCH + PORT_PITCH / 2,
+      y: origin.y + placed.top + sectionRowTop(row) + ROW_HEIGHT / 2,
     }
   }
   return undefined
@@ -187,12 +156,7 @@ function round2(value: number): number {
 
 /** The rendered faceplate height, mirroring the CSS box (border-box, 89px minimum). */
 function faceHeight(switch_: Switch): number {
-  const { main, left, right } = splitBanks(switch_.layout.sections.flatMap(sectionRows))
-  const contentHeight = faceContentHeight(
-    mainBankHeight(main),
-    uplinkBankHeight(left),
-    uplinkBankHeight(right),
-  )
+  const contentHeight = faceContentHeight(...switch_.layout.sections.map(sectionHeight))
   return contentHeight + 2 * FACE_BORDER + 2 * FACE_PADDING_Y
 }
 

@@ -34,23 +34,22 @@ function editableSections(switch_: Switch): SectionEdit[] {
  */
 export function SwitchEditor({ switch_, onChange, onLayoutEdit, onDelete }: SwitchEditorProps) {
   return (
-    <div className="flex flex-col gap-5">
-      <SwitchFields
-        name={switch_.name}
-        model={switch_.model}
-        sections={editableSections(switch_)}
-        onNameChange={(name) => onChange({ name })}
-        onModelChange={(model) => onChange({ model })}
-        onSectionsChange={(sections) => onLayoutEdit({ sections })}
-      />
-
-      <button
-        type="button"
-        className="self-start rounded-md border border-destructive px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        onClick={onDelete}
-      >
-        Delete switch
-      </button>
-    </div>
+    <SwitchFields
+      name={switch_.name}
+      model={switch_.model}
+      sections={editableSections(switch_)}
+      onNameChange={(name) => onChange({ name })}
+      onModelChange={(model) => onChange({ model })}
+      onSectionsChange={(sections) => onLayoutEdit({ sections })}
+      action={
+        <button
+          type="button"
+          className="self-start rounded-md border border-destructive px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          onClick={onDelete}
+        >
+          Delete switch
+        </button>
+      }
+    />
   )
 }
