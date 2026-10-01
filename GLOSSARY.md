@@ -13,7 +13,7 @@ A device in the setup, rendered as a faceplate and positioned on the canvas.
 _Avoid_: Device, node, box
 
 **Faceplate**:
-The rendered front panel of a switch: rows of ports with labels.
+The rendered front panel of a switch: sections of ports with labels.
 _Avoid_: Front panel, chassis
 
 **Port**:
@@ -29,7 +29,7 @@ The rated speed of a port: 100M, 1G, 2.5G, 5G or 10G in this effort.
 _Avoid_: Rate, bandwidth
 
 **Port layout**:
-A switch's arrangement of ports into rows.
+A switch's arrangement of ports into sections, each a grid of rows and columns.
 _Avoid_: Port map, configuration
 
 **Row**:
