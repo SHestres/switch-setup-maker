@@ -21,7 +21,7 @@ An individually addressable connector on a switch, with a printed label, a kind 
 _Avoid_: Jack, interface, socket
 
 **Port kind**:
-The connector family of a port: RJ45, SFP or SFP+ in this effort.
+The connector family of a port: RJ45 or SFP in this effort.
 _Avoid_: Type
 
 **Port speed**:

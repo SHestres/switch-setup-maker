@@ -41,14 +41,14 @@ function switchWith(sections: Section[], x = 0, y = 0): Switch {
   return { id: 'sw1', name: '', model: '', x, y, layout: { sections } }
 }
 
-/** The Unifi 48 Port shape: three 2×8 RJ45 sections then 2×2 SFP+ uplinks. */
+/** The Unifi 48 Port shape: three 2×8 RJ45 sections then 2×2 SFP uplinks. */
 function denseSwitch(x = 0, y = 0): Switch {
   return switchWith(
     [
       section('rj45', 2, 8, 1),
       section('rj45', 2, 8, 17),
       section('rj45', 2, 8, 33, '2.5G'),
-      section('sfp+', 2, 2, 49, '10G'),
+      section('sfp', 2, 2, 49, '10G'),
     ],
     x,
     y,
@@ -85,11 +85,11 @@ describe('portAnchor', () => {
   })
 
   it('separates neighbouring Sections of different kinds by 16px', () => {
-    // 1×2 RJ45 (54) then 1×1 SFP+ (27) with a 16px gap = 97; the group starts
+    // 1×2 RJ45 (54) then 1×1 SFP (27) with a 16px gap = 97; the group starts
     // at 38 + (764 - 97) / 2 = 371.5. One-row Sections are 33 high and center
     // inside the 77 field: top 28, row top 9, tile center 49.
     const switch_ = switchWith(
-      [section('rj45', 1, 2, 1), section('sfp+', 1, 1, 49, '10G')],
+      [section('rj45', 1, 2, 1), section('sfp', 1, 1, 49, '10G')],
       120,
       360,
     )
@@ -100,10 +100,10 @@ describe('portAnchor', () => {
   })
 
   it('centers a short Section against a tall neighbour', () => {
-    // 4-row RJ45 (132 high) then 2-row SFP+ (66 high): the field grows to 132,
+    // 4-row RJ45 (132 high) then 2-row SFP (66 high): the field grows to 132,
     // the tall Section sits at the top (y + 6) and the short one at
     // 6 + (132 - 66) / 2 = 39. Group: 27 + 16 + 27 = 70 wide, starting at 385.
-    const switch_ = switchWith([section('rj45', 4, 1, 1), section('sfp+', 2, 1, 5, '10G')])
+    const switch_ = switchWith([section('rj45', 4, 1, 1), section('sfp', 2, 1, 5, '10G')])
 
     expect(portAnchor(switch_, 'p1')).toEqual({ x: 398.5, y: 27 })
     expect(portAnchor(switch_, 'p4')).toEqual({ x: 398.5, y: 117 })
@@ -111,7 +111,7 @@ describe('portAnchor', () => {
     expect(portAnchor(switch_, 'p6')).toEqual({ x: 441.5, y: 84 })
   })
 
-  it('lays out a dense 48-port faceplate (3×2×8 RJ45, 4 SFP+)', () => {
+  it('lays out a dense 48-port faceplate (3×2×8 RJ45, 4 SFP)', () => {
     // Widths 216 + 216 + 216 + 54, gaps 6 + 6 + 16 = 730; the 764 field leaves
     // 17px slack each side, so the group starts at x + 55. All Sections are 66
     // high, top y + 11.5, row centers y + 32.5 / y + 56.5.
@@ -203,8 +203,8 @@ describe('connectionCurve', () => {
     ).toBe('M 505 409 C 505 473, 532 473, 532 409')
   })
 
-  it('keeps adjacent SFP+ uplinks clickable under a dense 48-port face', () => {
-    // The Unifi 48 Port shape: the SFP+ Section's p49/p50 anchors sit at
+  it('keeps adjacent SFP uplinks clickable under a dense 48-port face', () => {
+    // The Unifi 48 Port shape: the SFP Section's p49/p50 anchors sit at
     // (844.5, 82.5) and (871.5, 82.5) on a switch at (100, 50); their dip
     // must reach 139 + 8: bow (147 - 82.5) / 0.75 = 86.
     const setup = { switches: [denseSwitch(100, 50)], connections: [] }

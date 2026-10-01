@@ -30,6 +30,7 @@ import { createDraftSwitch, draftIsEdited, draftToSwitch } from '@/ui/draftSwitc
 import { Inspector } from '@/ui/Inspector'
 import { PresetGallery } from '@/ui/PresetGallery'
 import { SwitchEditor } from '@/ui/SwitchEditor'
+import type { SectionEditOptions } from '@/ui/SwitchFields'
 
 type InspectorState =
   { mode: 'gallery' } | { mode: 'draft' } | { mode: 'editor'; switchId: string } | null
@@ -232,13 +233,19 @@ export default function App() {
     setWireHint(null)
   }
 
-  const requestLayoutEdit = (edit: LayoutEdit) => {
+  /**
+   * A layout edit from the selected switch. Destructive edits confirm first, except a
+   * `live` typed change: that one is skipped, leaving the field to ask again on blur/Enter
+   * so no dialog can interrupt a longer number.
+   */
+  const requestLayoutEdit = (edit: LayoutEdit, options?: SectionEditOptions) => {
     const switch_ = selectedSwitch
     if (!switch_) return
 
     const plan = planLayoutEdit(switch_, edit)
     const connections = countSeveredConnections(document.setup, switch_.id, plan.removedPortIds)
     if (connections > 0) {
+      if (options?.live) return
       setConfirm({
         kind: 'layout',
         switchId: switch_.id,

@@ -147,7 +147,7 @@ describe('canvas', () => {
       within(core).getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }),
     ).toBeInTheDocument()
     expect(
-      within(core).getByRole('button', { name: 'SFP+ port 1 (10G) on Core' }),
+      within(core).getByRole('button', { name: 'SFP port 1 (10G) on Core' }),
     ).toBeInTheDocument()
     expect(within(core).getByText('3')).toBeInTheDocument()
 
@@ -382,20 +382,20 @@ const PRESET_LAYOUTS: PresetCase[] = [
           ],
         },
         {
-          kind: 'sfp+',
+          kind: 'sfp',
           speed: '10G',
           rows: 2,
           columns: 2,
           numbering: 'sequential',
           startMode: 'auto',
           start: 49,
-          ports: ports(49, ['49', '50', '51', '52'], 'sfp+', '10G'),
+          ports: ports(49, ['49', '50', '51', '52'], 'sfp', '10G'),
         },
       ],
     },
   },
   {
-    chip: '24×1G + 4×SFP+',
+    chip: '24×1G + 4×SFP',
     layout: {
       sections: [
         {
@@ -422,14 +422,14 @@ const PRESET_LAYOUTS: PresetCase[] = [
           ],
         },
         {
-          kind: 'sfp+',
+          kind: 'sfp',
           speed: '10G',
           rows: 2,
           columns: 2,
           numbering: 'sequential',
           startMode: 'auto',
           start: 25,
-          ports: ports(25, ['25', '26', '27', '28'], 'sfp+', '10G'),
+          ports: ports(25, ['25', '26', '27', '28'], 'sfp', '10G'),
         },
       ],
     },
@@ -476,7 +476,7 @@ describe('add switch', () => {
     expect(within(panel).getByRole('heading', { name: 'Add a switch' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '24×1G + 2×SFP' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: 'Unifi 48 Port' })).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: '24×1G + 4×SFP+' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '24×1G + 4×SFP' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '12×1G + 2×SFP' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: 'Start blank' })).toBeEnabled()
   })
@@ -869,7 +869,7 @@ describe('switch layout editor', () => {
     expect(within(panel).getByLabelText('Section 1 start mode')).toHaveValue('auto')
     expect(within(panel).getByLabelText('Section 1 start number')).toHaveValue(1)
     expect(within(panel).getByLabelText('Section 1 start number')).toBeDisabled()
-    expect(within(panel).getByLabelText('Section 2 port kind')).toHaveValue('sfp+')
+    expect(within(panel).getByLabelText('Section 2 port kind')).toHaveValue('sfp')
     expect(within(panel).getByLabelText('Section 2 numbering')).toHaveValue('sequential')
     expect(within(panel).getByLabelText('Section 2 start mode')).toHaveValue('custom')
     expect(within(panel).getByLabelText('Section 2 start number')).toHaveValue(1)
@@ -882,6 +882,104 @@ describe('switch layout editor', () => {
     expect(screen.getByRole('button', { name: 'RJ45 port 5 (1G) on Core' })).toBeInTheDocument()
     expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['1', '3', '5'])
     expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p50'])
+  })
+
+  it('commits a typed value immediately, with no pause or blur', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+
+    expect(storedLayout().sections[0].columns).toBe(3)
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['1', '3', '5'])
+    expect(screen.getByRole('button', { name: 'RJ45 port 5 (1G) on Core' })).toBeInTheDocument()
+  })
+
+  it('applies a safe shrink immediately and keeps the connections on surviving ports', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    // Dropping the unconnected p2 is safe: no confirm, and p1's connection survives.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1'])
+    expect(storedConnections()).toEqual([
+      { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p2' } },
+    ])
+  })
+
+  it('defers a typed severing shrink until blur, then confirms', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '1' })
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    // Nothing landed: the typed change waits so a confirm cannot interrupt a longer number.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
+
+    fireEvent.blur(columns)
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(columns).toHaveValue(2)
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
+    expect(storedConnections()).toHaveLength(2)
+  })
+
+  it('confirms a stepper change that severs immediately, without waiting for blur', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    // Type first: the marker is set to typing and must reset after that change.
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+    expect(storedLayout().sections[0].columns).toBe(3)
+
+    // A spinner click arrives without a keydown: a discrete step, so it confirms at once.
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(storedLayout().sections[0].columns).toBe(3)
+    expect(storedConnections()).toHaveLength(2)
+  })
+
+  it('treats an arrow key after typing as a discrete step that confirms at once', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+    expect(storedLayout().sections[0].columns).toBe(3)
+
+    // Arrow down from 3 to 1 would sever p2; the arrow resets the typing classification.
+    fireEvent.keyDown(columns, { key: 'ArrowDown' })
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(storedLayout().sections[0].columns).toBe(3)
+    expect(storedConnections()).toHaveLength(2)
   })
 
   it('marks an out-of-range dimension inline and never commits it', () => {
@@ -993,7 +1091,7 @@ describe('switch layout editor', () => {
 
     expect(storedLayout().sections[1].startMode).toBe('auto')
     expect(storedLayout().sections[1].start).toBe(4)
-    expect(screen.getByRole('button', { name: 'SFP+ port 4 (10G) on Core' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'SFP port 4 (10G) on Core' })).toBeInTheDocument()
   })
 
   it('edits a section’s speed and regenerates its port labels live', () => {
@@ -1006,7 +1104,7 @@ describe('switch layout editor', () => {
       target: { value: '1G' },
     })
 
-    expect(screen.getByRole('button', { name: 'SFP+ port 1 (1G) on Core' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'SFP port 1 (1G) on Core' })).toBeInTheDocument()
     expect(storedLayout().sections[1].speed).toBe('1G')
   })
 
@@ -1020,7 +1118,7 @@ describe('switch layout editor', () => {
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     const appended = storedLayout().sections[2]
-    // The pinned SFP+ section tops out at 1, so the new auto section starts at 2.
+    // The pinned SFP section tops out at 1, so the new auto section starts at 2.
     expect(appended).toMatchObject({
       rows: 2,
       columns: 8,
@@ -1044,13 +1142,13 @@ describe('switch layout editor', () => {
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Move section 2 left' }))
 
-    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['sfp+', 'rj45'])
+    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['sfp', 'rj45'])
     expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p49'])
     expect(storedConnections()).toHaveLength(1)
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Move section 1 right' }))
 
-    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['rj45', 'sfp+'])
+    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['rj45', 'sfp'])
   })
 
   it('re-renders the faceplate Sections in their new left-to-right order after a move', () => {
@@ -1068,13 +1166,13 @@ describe('switch layout editor', () => {
     expect(portNames()).toEqual([
       'RJ45 port 1 (1G) on Core',
       'RJ45 port 3 (1G) on Core',
-      'SFP+ port 1 (10G) on Core',
+      'SFP port 1 (10G) on Core',
     ])
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Move section 2 left' }))
 
     expect(portNames()).toEqual([
-      'SFP+ port 1 (10G) on Core',
+      'SFP port 1 (10G) on Core',
       'RJ45 port 2 (1G) on Core',
       'RJ45 port 4 (1G) on Core',
     ])
@@ -1097,7 +1195,7 @@ describe('switch layout editor', () => {
       screen.getByRole('button', { name: 'RJ45 port 13 (1G) on Unifi 48 Port' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'SFP+ port 45 (10G) on Unifi 48 Port' }),
+      screen.getByRole('button', { name: 'SFP port 45 (10G) on Unifi 48 Port' }),
     ).toBeInTheDocument()
   })
 
@@ -1221,7 +1319,7 @@ describe('switch layout editor', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(storedLayout().sections).toHaveLength(1)
     expect(
-      screen.queryByRole('button', { name: 'SFP+ port 1 (10G) on Core' }),
+      screen.queryByRole('button', { name: 'SFP port 1 (10G) on Core' }),
     ).not.toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: 'Remove section 1' })).toBeDisabled()
     expect(storedConnections()).toHaveLength(1)
@@ -1387,7 +1485,7 @@ describe('wiring', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' }))
-    fireEvent.click(screen.getByRole('button', { name: 'SFP+ port 1 (10G) on Core' }))
+    fireEvent.click(screen.getByRole('button', { name: 'SFP port 1 (10G) on Core' }))
 
     expect(
       wireLayerElement().querySelector('[data-connection="sw1:p2-sw1:p49"]'),
@@ -1582,8 +1680,8 @@ describe('draft switch', () => {
     expect(storedSwitches()).toHaveLength(0)
 
     const columns = within(inspector()).getByLabelText('Section 1 columns')
+    // The number commits immediately; no blur needed.
     fireEvent.change(columns, { target: { value: '4' } })
-    fireEvent.blur(columns)
 
     expect(within(preview).getByText('7')).toBeInTheDocument()
     expect(within(preview).queryByText('9')).not.toBeInTheDocument()

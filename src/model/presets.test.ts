@@ -34,7 +34,7 @@ describe('layout presets', () => {
     expect(labels(switch_, 1)).toEqual(['1', '2'])
   })
 
-  it('builds the Unifi 48 Port as three RJ45 sections plus SFP+ 49–52', () => {
+  it('builds the Unifi 48 Port as three RJ45 sections plus SFP 49–52', () => {
     const switch_ = build('unifi-48-port')
 
     expect(switch_.model).toBe('Unifi 48 Port')
@@ -62,8 +62,8 @@ describe('layout presets', () => {
     expect(labels(switch_, 3)).toEqual(['49', '50', '51', '52'])
   })
 
-  it('builds 24×1G + 4×SFP+ with the uplink block continuing at 25–28', () => {
-    const switch_ = build('24x1g-4xsfp-plus')
+  it('builds 24×1G + 4×SFP with the uplink block continuing at 25–28', () => {
+    const switch_ = build('24x1g-4xsfp')
 
     expect(switch_.layout.sections.map((section) => section.start)).toEqual([1, 25])
     expect(switch_.layout.sections.map((section) => section.ports.length)).toEqual([24, 4])

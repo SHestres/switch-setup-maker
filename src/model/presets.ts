@@ -75,18 +75,18 @@ export const LAYOUT_PRESETS: readonly LayoutPreset[] = [
       {
         rows: 2,
         columns: 2,
-        kind: 'sfp+',
+        kind: 'sfp',
         speed: '10G',
         numbering: 'sequential',
         startMode: 'auto',
       },
     ],
     details:
-      'Three 2×8 RJ45 sections, 1G then 2.5G, alternating top-first (1–48); 4 SFP+ 10G uplinks at 49–52.',
+      'Three 2×8 RJ45 sections, 1G then 2.5G, alternating top-first (1–48); 4 SFP 10G uplinks at 49–52.',
   },
   {
-    id: '24x1g-4xsfp-plus',
-    label: '24×1G + 4×SFP+',
+    id: '24x1g-4xsfp',
+    label: '24×1G + 4×SFP',
     sections: [
       {
         rows: 2,
@@ -99,14 +99,14 @@ export const LAYOUT_PRESETS: readonly LayoutPreset[] = [
       {
         rows: 2,
         columns: 2,
-        kind: 'sfp+',
+        kind: 'sfp',
         speed: '10G',
         numbering: 'sequential',
         startMode: 'auto',
       },
     ],
     details:
-      '2 rows of 12 RJ45 1G ports, alternating top-first (1–24); a 2×2 SFP+ 10G uplink block at 25–28.',
+      '2 rows of 12 RJ45 1G ports, alternating top-first (1–24); a 2×2 SFP 10G uplink block at 25–28.',
   },
   {
     id: '12x1g-2xsfp',

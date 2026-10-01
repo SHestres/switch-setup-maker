@@ -148,7 +148,6 @@ function PortRow({ row, scope }: { row: Row; scope: PortScope }) {
 
 function PortButton({ port, scope }: { port: Port; scope: PortScope }) {
   const { switchId, switchName, ghost, connectedPorts, pendingPortId, onPortClick } = scope
-  const kind = port.kind === 'sfp+' ? 'sfpp' : port.kind
   const isCage = port.kind !== 'rj45'
   const content = (
     <>
@@ -160,7 +159,7 @@ function PortButton({ port, scope }: { port: Port; scope: PortScope }) {
 
   if (ghost) {
     return (
-      <span className={`port kind-${kind}`} data-port={port.id} aria-hidden="true">
+      <span className={`port kind-${port.kind}`} data-port={port.id} aria-hidden="true">
         {content}
       </span>
     )
@@ -171,7 +170,7 @@ function PortButton({ port, scope }: { port: Port; scope: PortScope }) {
   return (
     <button
       type="button"
-      className={`port kind-${kind}${connected ? ' connected' : ''}${pending ? ' pending' : ''}`}
+      className={`port kind-${port.kind}${connected ? ' connected' : ''}${pending ? ' pending' : ''}`}
       data-port={port.id}
       aria-label={portAriaLabel(port, switchName)}
       onClick={(event) => {

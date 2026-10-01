@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { resolveSectionStarts, sectionLabelRange } from '@/model/layout'
@@ -41,7 +41,16 @@ const START_MODE_LABELS: Record<SectionStartMode, string> = {
   custom: 'Custom',
 }
 
-const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP', 'sfp+': 'SFP+' }
+const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP' }
+
+/**
+ * How a section edit should be applied. `live` marks a change made while typing in a
+ * number field: the app applies it only when it severs nothing, so a confirm can never
+ * interrupt a longer number. Stepper/arrow changes and blur/Enter commit without `live`.
+ */
+export interface SectionEditOptions {
+  live?: boolean
+}
 
 export interface SwitchFieldsProps {
   name: string
@@ -49,7 +58,7 @@ export interface SwitchFieldsProps {
   sections: readonly SectionEdit[]
   onNameChange: (name: string) => void
   onModelChange: (model: string) => void
-  onSectionsChange: (sections: SectionEdit[]) => void
+  onSectionsChange: (sections: SectionEdit[], options?: SectionEditOptions) => void
   /** Mode-specific copy under the identity fields. */
   notes?: ReactNode
   /** The mode's action, e.g. `Add switch` or `Delete switch`. */
@@ -73,11 +82,16 @@ export function SwitchFields({
 }: SwitchFieldsProps) {
   const starts = resolveSectionStarts(sections.map((section) => section.spec))
 
-  const changeSection = (index: number, changes: Partial<SectionSpec>) =>
+  const changeSection = (
+    index: number,
+    changes: Partial<SectionSpec>,
+    options?: SectionEditOptions,
+  ) =>
     onSectionsChange(
       sections.map((section, sectionIndex) =>
         sectionIndex === index ? { ...section, spec: { ...section.spec, ...changes } } : section,
       ),
+      options,
     )
 
   const changeStartMode = (index: number, startMode: SectionStartMode) => {
@@ -126,10 +140,6 @@ export function SwitchFields({
           />
         </label>
         {notes}
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Sections render left → right, each centered vertically. Same-kind neighbours sit 6px apart;
-          different kinds 16px.
-        </p>
         {action}
       </div>
 
@@ -142,7 +152,7 @@ export function SwitchFields({
             start={starts[index]}
             last={index === sections.length - 1}
             removable={sections.length > 1}
-            onSpecChange={(changes) => changeSection(index, changes)}
+            onSpecChange={(changes, options) => changeSection(index, changes, options)}
             onStartModeChange={(startMode) => changeStartMode(index, startMode)}
             onMoveLeft={() => moveSection(index, -1)}
             onMoveRight={() => moveSection(index, 1)}
@@ -168,7 +178,7 @@ interface SectionCardProps {
   start: number
   last: boolean
   removable: boolean
-  onSpecChange: (changes: Partial<SectionSpec>) => void
+  onSpecChange: (changes: Partial<SectionSpec>, options?: SectionEditOptions) => void
   onStartModeChange: (startMode: SectionStartMode) => void
   onMoveLeft: () => void
   onMoveRight: () => void
@@ -205,7 +215,7 @@ function SectionCard({
           value={spec.rows}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
-          onCommit={(rows) => onSpecChange({ rows })}
+          onCommit={(rows, live) => onSpecChange({ rows }, { live })}
         />
         <NumberField
           label={`Section ${sectionNumber} columns`}
@@ -213,7 +223,7 @@ function SectionCard({
           value={spec.columns}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
-          onCommit={(columns) => onSpecChange({ columns })}
+          onCommit={(columns, live) => onSpecChange({ columns }, { live })}
         />
         <SelectField
           label={`Section ${sectionNumber} port kind`}
@@ -259,7 +269,7 @@ function SectionCard({
             min={START_MIN}
             max={START_MAX}
             disabled={spec.startMode !== 'custom'}
-            onCommit={(value) => onSpecChange({ start: value })}
+            onCommit={(value, live) => onSpecChange({ start: value }, { live })}
           />
         </div>
       </div>
@@ -344,12 +354,16 @@ interface NumberFieldProps {
   min: number
   max: number
   disabled?: boolean
-  onCommit: (value: number) => void
+  /** `live` marks a change typed in the field; blur, Enter and stepper changes commit without it. */
+  onCommit: (value: number, live: boolean) => void
 }
 
 /**
- * A number is committed on blur or Enter, not per keystroke: "2" on the way to "24" is a
- * different layout, and each invalid or intermediate value must never reach the document.
+ * A valid number reaches the document immediately — no pause, no blur needed. A typed
+ * value that would sever connections carries `live` instead, so the app can skip it and
+ * wait for blur or Enter, where the confirm belongs; a dialog can then never interrupt a
+ * longer number. Stepper clicks and arrow keys are discrete, so their destructive change
+ * commits without `live` and confirms at once. Invalid values never commit.
  */
 function NumberField({
   label,
@@ -367,9 +381,26 @@ function NumberField({
   const parsed = /^\d+$/.test(shown.trim()) ? Number(shown) : null
   const invalid = parsed === null || parsed < min || parsed > max
 
+  // A keydown for an editing key marks the change that follows as typing; anything else
+  // (a stepper click, an arrow key) is a discrete step. Reset after every change so a
+  // stepper click right after typing is never mistaken for more typing.
+  const typingRef = useRef(false)
+
+  const tryCommit = (next: number, live: boolean) => {
+    if (next !== value) onCommit(next, live)
+  }
+
+  const handleChange = (raw: string) => {
+    setDraft(raw)
+    const next = /^\d+$/.test(raw.trim()) ? Number(raw) : null
+    if (next !== null && next >= min && next <= max) tryCommit(next, typingRef.current)
+    typingRef.current = false
+  }
+
   const commit = () => {
-    if (!invalid && parsed !== value) onCommit(parsed)
+    if (!invalid && parsed !== null) tryCommit(parsed, false)
     setDraft(null)
+    typingRef.current = false
   }
 
   return (
@@ -386,10 +417,20 @@ function NumberField({
         aria-describedby={invalid ? errorId : undefined}
         disabled={disabled}
         value={shown}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => handleChange(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
+          if (event.key === 'Enter') {
+            commit()
+            return
+          }
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            typingRef.current = false
+            return
+          }
+          if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+            typingRef.current = true
+          }
         }}
       />
       {invalid && (

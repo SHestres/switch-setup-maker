@@ -58,6 +58,59 @@ describe('round trip', () => {
   })
 })
 
+describe('legacy port kinds', () => {
+  it('reads a version 2 sfp+ section and its ports as sfp, keeping the speed', () => {
+    const result = parseDocument({
+      version: 2,
+      setup: {
+        switches: [
+          {
+            id: 'sw1',
+            name: 'Core',
+            model: '',
+            x: 0,
+            y: 0,
+            layout: {
+              sections: [
+                {
+                  kind: 'sfp+',
+                  speed: '10G',
+                  rows: 1,
+                  columns: 2,
+                  numbering: 'sequential',
+                  startMode: 'auto',
+                  start: 1,
+                  ports: [
+                    { id: 'p1', label: '1', kind: 'sfp+', speed: '10G' },
+                    { id: 'p2', label: '2', kind: 'sfp+', speed: '10G' },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+        connections: [],
+      },
+    })
+    if (!result.ok) throw new Error(result.error)
+
+    const section = result.document.setup.switches[0].layout.sections[0]
+    expect(section.kind).toBe('sfp')
+    expect(section.speed).toBe('10G')
+    expect(section.ports.map((entry) => entry.kind)).toEqual(['sfp', 'sfp'])
+    expect(serializeDocument(result.document)).not.toContain('sfp+')
+  })
+
+  it('reads the sfp+ spelling in a version 1 row too', () => {
+    const sections = migratedSections([
+      { ports: [port('p1', '1', 'sfp+', '10G'), port('p2', '2', 'sfp+', '10G')] },
+    ])
+
+    expect(sections[0]).toMatchObject({ kind: 'sfp', speed: '10G' })
+    expect(sections[0].ports.map((entry) => entry.kind)).toEqual(['sfp', 'sfp'])
+  })
+})
+
 describe('version', () => {
   it('rejects an unknown version', () => {
     expect(rejectedDocument({ version: 3 })).toContain('3')
@@ -189,12 +242,12 @@ describe('migrating version 1', () => {
     const sections = migratedSections([
       { ports: [port('p1', '1'), port('p2', '3')] },
       { ports: [port('p3', '2'), port('p4', '4')] },
-      { ports: [port('p5', '5', 'sfp+', '10G'), port('p6', '6', 'sfp+', '10G')] },
+      { ports: [port('p5', '5', 'sfp', '10G'), port('p6', '6', 'sfp', '10G')] },
     ])
 
     expect(sections).toHaveLength(2)
     expect(sections[1]).toMatchObject({
-      kind: 'sfp+',
+      kind: 'sfp',
       speed: '10G',
       startMode: 'auto',
       start: 5,
