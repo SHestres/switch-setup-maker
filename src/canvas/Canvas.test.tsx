@@ -78,7 +78,7 @@ describe('Canvas', () => {
     expect(onMoveSwitch).not.toHaveBeenCalled()
   })
 
-  it('reports its rendered size so new switches can be centred on what is visible', () => {
+  it('reports its rendered size so new switches can be centered on what is visible', () => {
     const onCanvasSizeChange = vi.fn()
     const rect = vi
       .spyOn(Element.prototype, 'getBoundingClientRect')

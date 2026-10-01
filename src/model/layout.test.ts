@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   generateSectionLabels,
-  materialiseSections,
+  materializeSections,
   nextPortId,
   relabelSections,
   removePortsFromSwitch,
@@ -189,9 +189,9 @@ describe('resolveSectionStarts', () => {
   })
 })
 
-describe('materialiseSections', () => {
-  it('materialises every row×column port with generated labels and readable ids', () => {
-    const sections = materialiseSections([
+describe('materializeSections', () => {
+  it('materializes every row×column port with generated labels and readable ids', () => {
+    const sections = materializeSections([
       spec({ rows: 2, columns: 2 }),
       spec({ rows: 2, columns: 2, numbering: 'sequential', startMode: 'custom', start: 7 }),
     ])
@@ -231,7 +231,7 @@ describe('materialiseSections', () => {
   })
 
   it('writes the resolved start onto every section, including auto ones', () => {
-    const sections = materialiseSections([
+    const sections = materializeSections([
       spec({ rows: 2, columns: 8, startMode: 'custom', start: 33 }),
       spec({ rows: 1, columns: 2, numbering: 'sequential' }),
     ])
@@ -242,7 +242,7 @@ describe('materialiseSections', () => {
 
 describe('relabelSections', () => {
   it('regenerates labels for a changed convention without touching port ids', () => {
-    const sections = materialiseSections([spec({ rows: 2, columns: 2 })])
+    const sections = materializeSections([spec({ rows: 2, columns: 2 })])
     const changed = sections.map((section) => ({ ...section, numbering: 'sequential' as const }))
 
     const relabelled = relabelSections({ sections: changed })
@@ -252,7 +252,7 @@ describe('relabelSections', () => {
   })
 
   it('renumbers following auto sections after an earlier custom start moves', () => {
-    const sections = materialiseSections([
+    const sections = materializeSections([
       spec({ rows: 2, columns: 2 }),
       spec({ rows: 1, columns: 1, numbering: 'sequential' }),
     ])
@@ -270,7 +270,7 @@ describe('relabelSections', () => {
   })
 
   it('keeps a later custom section pinned when an earlier section changes', () => {
-    const sections = materialiseSections([
+    const sections = materializeSections([
       spec({ rows: 2, columns: 2 }),
       spec({ rows: 1, columns: 1, numbering: 'sequential', startMode: 'custom', start: 50 }),
     ])
@@ -287,8 +287,8 @@ describe('relabelSections', () => {
 })
 
 describe('sectionRows', () => {
-  it('slices the materialised grid into faceplate rows, row by row', () => {
-    const [section] = materialiseSections([spec({ rows: 2, columns: 2 })])
+  it('slices the materialized grid into faceplate rows, row by row', () => {
+    const [section] = materializeSections([spec({ rows: 2, columns: 2 })])
 
     expect(sectionRows(section).map((row) => row.ports.map((port) => port.label))).toEqual([
       ['1', '3'],
@@ -300,7 +300,7 @@ describe('sectionRows', () => {
 describe('removePortsFromSwitch', () => {
   it('drops a section once its last port is gone while the others stay', () => {
     const original = switchWith(
-      materialiseSections([spec({ rows: 1, columns: 2 }), spec({ rows: 1, columns: 1 })]),
+      materializeSections([spec({ rows: 1, columns: 2 }), spec({ rows: 1, columns: 1 })]),
     )
 
     const updated = removePortsFromSwitch(original, ['p1', 'p2'])
@@ -310,7 +310,7 @@ describe('removePortsFromSwitch', () => {
   })
 
   it('keeps sections that still have ports', () => {
-    const original = switchWith(materialiseSections([spec({ rows: 1, columns: 3 })]))
+    const original = switchWith(materializeSections([spec({ rows: 1, columns: 3 })]))
     const [section] = original.layout.sections
 
     const updated = removePortsFromSwitch(original, [section.ports[0].id])
@@ -322,7 +322,7 @@ describe('removePortsFromSwitch', () => {
 
 describe('nextPortId', () => {
   it('counts one past the highest existing suffix', () => {
-    const existing: Port[] = materialiseSections([spec({ rows: 2, columns: 2 })])[0].ports
+    const existing: Port[] = materializeSections([spec({ rows: 2, columns: 2 })])[0].ports
     existing.push({ id: 'p48', label: '48', kind: 'rj45', speed: '1G' })
 
     expect(nextPortId(existing)).toBe('p49')

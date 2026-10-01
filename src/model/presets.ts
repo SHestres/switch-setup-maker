@@ -1,4 +1,4 @@
-import { materialiseSections } from './layout'
+import { materializeSections } from './layout'
 import type { SectionSpec } from './layout'
 import type { Switch } from './types'
 
@@ -148,6 +148,6 @@ export function switchFromPreset(
     model: preset.model ?? '',
     x: position.x,
     y: position.y,
-    layout: { sections: materialiseSections(preset.sections) },
+    layout: { sections: materializeSections(preset.sections) },
   }
 }
