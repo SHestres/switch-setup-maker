@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { materialiseSections } from './layout'
+import { materializeSections } from './layout'
 import type { SectionSpec } from './layout'
 import { applyLayoutEdit, countSeveredConnections, planLayoutEdit } from './layoutEdit'
 import type { LayoutEdit } from './layoutEdit'
@@ -36,7 +36,7 @@ function documentWith(setup: Setup): SetupDocument {
 
 describe('planLayoutEdit', () => {
   it('keeps the surviving ports’ ids when columns shrink, and severs the surplus', () => {
-    const original = switchWith(materialiseSections([spec({ rows: 2, columns: 3 })]))
+    const original = switchWith(materializeSections([spec({ rows: 2, columns: 3 })]))
 
     const plan = planLayoutEdit(
       original,
@@ -60,7 +60,7 @@ describe('planLayoutEdit', () => {
   })
 
   it('mints fresh ids after the switch’s highest id when columns grow', () => {
-    const original = switchWith(materialiseSections([spec({ rows: 2, columns: 3 })]))
+    const original = switchWith(materializeSections([spec({ rows: 2, columns: 3 })]))
 
     const plan = planLayoutEdit(
       original,
@@ -92,7 +92,7 @@ describe('planLayoutEdit', () => {
   })
 
   it('keeps surviving positions when columns shrink and rows grow at once', () => {
-    const original = switchWith(materialiseSections([spec({ rows: 2, columns: 3 })]))
+    const original = switchWith(materializeSections([spec({ rows: 2, columns: 3 })]))
 
     const plan = planLayoutEdit(
       original,
@@ -112,7 +112,7 @@ describe('planLayoutEdit', () => {
   })
 
   it('severs a removed section’s ports while later sections keep their ids', () => {
-    const original = switchWith(materialiseSections([spec(), spec()]))
+    const original = switchWith(materializeSections([spec(), spec()]))
 
     const plan = planLayoutEdit(original, edit({ sections: [{ source: 1, spec: spec() }] }))
 
@@ -132,7 +132,7 @@ describe('planLayoutEdit', () => {
   })
 
   it('keeps ids through kind, speed and numbering changes, regenerating labels', () => {
-    const original = switchWith(materialiseSections([spec()]))
+    const original = switchWith(materializeSections([spec()]))
 
     const plan = planLayoutEdit(
       original,
@@ -162,7 +162,7 @@ describe('planLayoutEdit', () => {
   })
 
   it('mints ids for an appended section and records its start mode', () => {
-    const original = switchWith(materialiseSections([spec()]))
+    const original = switchWith(materializeSections([spec()]))
 
     const plan = planLayoutEdit(
       original,
@@ -192,7 +192,7 @@ describe('planLayoutEdit', () => {
 
   it('renumbers following auto sections when an earlier section is resized', () => {
     const original = switchWith(
-      materialiseSections([spec(), spec({ rows: 1, columns: 1, numbering: 'sequential' })]),
+      materializeSections([spec(), spec({ rows: 1, columns: 1, numbering: 'sequential' })]),
     )
     expect(original.layout.sections[1].start).toBe(5)
 
@@ -213,7 +213,7 @@ describe('planLayoutEdit', () => {
 
   it('keeps a pinned custom section while an earlier auto section is resized', () => {
     const original = switchWith(
-      materialiseSections([
+      materializeSections([
         spec(),
         spec({ rows: 1, columns: 1, numbering: 'sequential', startMode: 'custom', start: 50 }),
       ]),
@@ -246,7 +246,7 @@ describe('planLayoutEdit', () => {
 
 describe('countSeveredConnections', () => {
   const setup: Setup = {
-    switches: [switchWith(materialiseSections([spec()]))],
+    switches: [switchWith(materializeSections([spec()]))],
     connections: [
       { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p1' } },
       { a: { switch: 'sw1', port: 'p2' }, b: { switch: 'sw2', port: 'p2' } },
@@ -268,7 +268,7 @@ describe('countSeveredConnections', () => {
 
 describe('applyLayoutEdit', () => {
   it('rebuilds the switch and purges every connection that lost its port', () => {
-    const core = switchWith(materialiseSections([spec({ rows: 1, columns: 3 })]))
+    const core = switchWith(materializeSections([spec({ rows: 1, columns: 3 })]))
     const document = documentWith({
       switches: [core],
       connections: [

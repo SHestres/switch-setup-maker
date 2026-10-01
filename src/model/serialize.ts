@@ -177,7 +177,7 @@ function readSwitch(raw: JsonObject, where: string): Switch {
 }
 
 /**
- * Sections carry generated data (labels, resolved auto starts), so parsing normalises
+ * Sections carry generated data (labels, resolved auto starts), so parsing normalizes
  * them: whatever came in, the document in memory matches its numbering conventions.
  */
 function readLayout(raw: JsonObject, where: string): PortLayout {

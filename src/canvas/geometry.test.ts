@@ -70,24 +70,24 @@ function deepestPoint(d: string): { x: number; y: number } {
 }
 
 describe('portAnchor', () => {
-  it('lays same-kind Sections left to right 6px apart, each centred vertically', () => {
+  it('lays same-kind Sections left to right 6px apart, each centered vertically', () => {
     // Two 2×2 RJ45 Sections: widths 54 + 54 with one 6px gap = 114.
     // portfield spans x+38..x+802, so the group starts at 38 + (764 - 114) / 2 = 363.
     // Both Sections are 66 high against the 77 chassis field, so top = 6 + 5.5 = 11.5.
-    // Row tops +9 and +33; tile centres +12 -> 32.5 and 56.5.
+    // Row tops +9 and +33; tile centers +12 -> 32.5 and 56.5.
     const switch_ = switchWith([section('rj45', 2, 2, 1), section('rj45', 2, 2, 5)], 10, 20)
 
     expect(portAnchor(switch_, 'p1')).toEqual({ x: 386.5, y: 52.5 })
     expect(portAnchor(switch_, 'p4')).toEqual({ x: 413.5, y: 76.5 })
-    // The second Section starts after 54 + 6 and centres on the same rows.
+    // The second Section starts after 54 + 6 and centers on the same rows.
     expect(portAnchor(switch_, 'p5')).toEqual({ x: 446.5, y: 52.5 })
     expect(portAnchor(switch_, 'p6')).toEqual({ x: 473.5, y: 52.5 })
   })
 
   it('separates neighbouring Sections of different kinds by 16px', () => {
     // 1×2 RJ45 (54) then 1×1 SFP+ (27) with a 16px gap = 97; the group starts
-    // at 38 + (764 - 97) / 2 = 371.5. One-row Sections are 33 high and centre
-    // inside the 77 field: top 28, row top 9, tile centre 49.
+    // at 38 + (764 - 97) / 2 = 371.5. One-row Sections are 33 high and center
+    // inside the 77 field: top 28, row top 9, tile center 49.
     const switch_ = switchWith(
       [section('rj45', 1, 2, 1), section('sfp+', 1, 1, 49, '10G')],
       120,
@@ -99,7 +99,7 @@ describe('portAnchor', () => {
     expect(portAnchor(switch_, 'p49')).toEqual({ x: 575, y: 409 })
   })
 
-  it('centres a short Section against a tall neighbour', () => {
+  it('centers a short Section against a tall neighbour', () => {
     // 4-row RJ45 (132 high) then 2-row SFP+ (66 high): the field grows to 132,
     // the tall Section sits at the top (y + 6) and the short one at
     // 6 + (132 - 66) / 2 = 39. Group: 27 + 16 + 27 = 70 wide, starting at 385.
@@ -114,7 +114,7 @@ describe('portAnchor', () => {
   it('lays out a dense 48-port faceplate (3×2×8 RJ45, 4 SFP+)', () => {
     // Widths 216 + 216 + 216 + 54, gaps 6 + 6 + 16 = 730; the 764 field leaves
     // 17px slack each side, so the group starts at x + 55. All Sections are 66
-    // high, top y + 11.5, row centres y + 32.5 / y + 56.5.
+    // high, top y + 11.5, row centers y + 32.5 / y + 56.5.
     const switch_ = denseSwitch(100, 50)
 
     expect(portAnchor(switch_, 'p1')).toEqual({ x: 168.5, y: 82.5 })
@@ -131,7 +131,7 @@ describe('portAnchor', () => {
   it('grows the faceplate when a Section exceeds the chassis height', () => {
     // A single 6-row Section: three 66-high pairs = 198, so the field grows to
     // 198 (face 210) and the Section top sits at y + 6. Row 5's top is
-    // 2*66 + 9 + 24 = 165, its tile centre y + 183.
+    // 2*66 + 9 + 24 = 165, its tile center y + 183.
     const switch_ = switchWith([section('rj45', 6, 1, 1)], 10, 20)
 
     expect(portAnchor(switch_, 'p1')).toEqual({ x: 430, y: 47 })

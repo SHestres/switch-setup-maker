@@ -1,11 +1,11 @@
-import { materialiseSections } from '@/model/layout'
+import { materializeSections } from '@/model/layout'
 import type { SectionEdit } from '@/model/layoutEdit'
 import type { Switch } from '@/model/types'
 
 /**
  * A switch being built by hand. Ephemeral App-level UI state: the draft is
  * previewed on the canvas but never enters the document or storage until
- * `Add switch` materialises it.
+ * `Add switch` materializes it.
  */
 export interface DraftSwitch {
   name: string
@@ -38,7 +38,7 @@ export function draftToSwitch(draft: DraftSwitch, id = ''): Switch {
     model: draft.model,
     x: draft.x,
     y: draft.y,
-    layout: { sections: materialiseSections(draft.sections.map((section) => section.spec)) },
+    layout: { sections: materializeSections(draft.sections.map((section) => section.spec)) },
   }
 }
 

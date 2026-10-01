@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
 import { FACE_HEIGHT, RACK_WIDTH } from './constants'
-import { DEFAULT_CANVAS_SIZE, placeNewSwitch, visibleCentre } from './placement'
+import { DEFAULT_CANVAS_SIZE, placeNewSwitch, visibleCenter } from './placement'
 import type { Point } from './geometry'
 
-describe('visibleCentre', () => {
-  it('maps the container centre through the viewport transform', () => {
-    expect(visibleCentre({ x: 0, y: 0, zoom: 1 }, { width: 1000, height: 600 })).toEqual({
+describe('visibleCenter', () => {
+  it('maps the container center through the viewport transform', () => {
+    expect(visibleCenter({ x: 0, y: 0, zoom: 1 }, { width: 1000, height: 600 })).toEqual({
       x: 500,
       y: 300,
     })
-    expect(visibleCentre({ x: -400, y: -200, zoom: 2 }, { width: 1000, height: 600 })).toEqual({
+    expect(visibleCenter({ x: -400, y: -200, zoom: 2 }, { width: 1000, height: 600 })).toEqual({
       x: 450,
       y: 250,
     })
   })
 
   it('falls back to the default canvas size when the host reports no size', () => {
-    expect(visibleCentre({ x: 0, y: 0, zoom: 1 }, { width: 0, height: 0 })).toEqual({
+    expect(visibleCenter({ x: 0, y: 0, zoom: 1 }, { width: 0, height: 0 })).toEqual({
       x: DEFAULT_CANVAS_SIZE.width / 2,
       y: DEFAULT_CANVAS_SIZE.height / 2,
     })
@@ -25,7 +25,7 @@ describe('visibleCentre', () => {
 })
 
 describe('placeNewSwitch', () => {
-  it('centres the rack on the visible centre', () => {
+  it('centers the rack on the visible center', () => {
     expect(placeNewSwitch({ x: 0, y: 0, zoom: 1 }, { width: 1000, height: 600 })).toEqual({
       x: 60,
       y: 255.5,
@@ -53,7 +53,7 @@ describe('placeNewSwitch', () => {
     expect(placeNewSwitch(viewport, container, [first, second])).not.toEqual(first)
   })
 
-  it('never reuses the slot of a switch dragged onto the centre', () => {
+  it('never reuses the slot of a switch dragged onto the center', () => {
     const viewport = { x: 0, y: 0, zoom: 1 }
     const container = { width: 1000, height: 600 }
     const dragged = { x: 60, y: 255.5 }

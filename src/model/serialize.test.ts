@@ -329,7 +329,7 @@ describe('tolerance', () => {
     })
   })
 
-  it('normalises derived labels and auto starts on load', () => {
+  it('normalizes derived labels and auto starts on load', () => {
     const document = validDocument()
     document.setup.switches[0].layout.sections[0].start = 99
     document.setup.switches[0].layout.sections[0].ports[0].label = 'stale'

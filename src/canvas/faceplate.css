@@ -96,13 +96,13 @@
   stroke: var(--wire-hover);
 }
 
-/* The selected cable, highlighted in the theme's wire highlight colour. */
+/* The selected cable, highlighted in the theme's wire highlight color. */
 .canvas-root .wire-layer path.selected {
   stroke: var(--wire-hover);
   stroke-width: calc(var(--wire-width) * 1.5 * 1px);
 }
 
-/* The mouse-only delete affordance, centred on the selected cable's midpoint. */
+/* The mouse-only delete affordance, centered on the selected cable's midpoint. */
 .canvas-root .wire-actions {
   position: absolute;
   z-index: 6;

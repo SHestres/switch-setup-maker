@@ -491,7 +491,7 @@ describe('add switch', () => {
     expect(storedSwitches()[0].layout).toEqual(layout)
   })
 
-  it('lands each new switch at the visible centre with the diagonal cascade', () => {
+  it('lands each new switch at the visible center with the diagonal cascade', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
@@ -572,7 +572,7 @@ describe('add switch', () => {
     ).toBeInTheDocument()
   })
 
-  it('places new switches at the visible centre after panning and zooming', async () => {
+  it('places new switches at the visible center after panning and zooming', async () => {
     render(<App />)
     const incoming = sampleDocument()
     incoming.setup = { switches: [], connections: [] }

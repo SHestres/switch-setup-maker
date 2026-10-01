@@ -94,8 +94,8 @@ function sectionRowTop(index: number): number {
 
 /**
  * The Sections' horizontal placement: left to right from the portfield's
- * centre, with 6px between same-kind neighbours and 16px otherwise. Each
- * Section is centred vertically against the tallest one (or the chassis).
+ * center, with 6px between same-kind neighbours and 16px otherwise. Each
+ * Section is centered vertically against the tallest one (or the chassis).
  */
 function placedSections(switch_: Switch): PlacedSection[] {
   const { sections } = switch_.layout
@@ -130,7 +130,7 @@ function placedSections(switch_: Switch): PlacedSection[] {
   })
 }
 
-/** Where a port's tile centre sits in canvas coordinates, or undefined if absent. */
+/** Where a port's tile center sits in canvas coordinates, or undefined if absent. */
 export function portAnchor(
   switch_: Switch,
   portId: string,

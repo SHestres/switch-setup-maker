@@ -40,7 +40,7 @@ export interface CanvasProps {
   pendingPort?: PortRef | null
   /** A connection refusal to show near the offending Port. */
   hint?: WireHintState | null
-  /** The rendered container size, so placement can land on the visible centre. */
+  /** The rendered container size, so placement can land on the visible center. */
   onCanvasSizeChange?: (size: Size) => void
 }
 
@@ -123,7 +123,7 @@ export function Canvas({
     if (pendingPort) setPointer({ ref: pendingPort, point: pointFromEvent(event) })
   }
 
-  // Report the rendered size so new switches can be centred on what is visible.
+  // Report the rendered size so new switches can be centered on what is visible.
   useEffect(() => {
     const element = rootRef.current
     if (!element || !onCanvasSizeChange) return

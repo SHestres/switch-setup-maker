@@ -74,7 +74,7 @@ export function sectionLabelRange(grid: SectionGrid, start: number): string {
   return first === last ? String(first) : `${first}–${last}`
 }
 
-function normaliseStart(start: number | undefined): number {
+function normalizeStart(start: number | undefined): number {
   if (start === undefined || !Number.isFinite(start)) return 0
   return Math.max(0, Math.trunc(start))
 }
@@ -87,7 +87,7 @@ function normaliseStart(start: number | undefined): number {
 export function resolveSectionStarts(sections: readonly SectionSpec[]): number[] {
   let next = 1
   return sections.map((section) => {
-    const start = section.startMode === 'custom' ? normaliseStart(section.start) : next
+    const start = section.startMode === 'custom' ? normalizeStart(section.start) : next
     const labels = generateSectionLabels(section, start).flat()
     const highest = labels.reduce((max, label) => Math.max(max, Number(label)), start - 1)
     next = highest + 1
@@ -96,7 +96,7 @@ export function resolveSectionStarts(sections: readonly SectionSpec[]): number[]
 }
 
 /** Build Sections (with fresh stable ids) from a section-builder draft. */
-export function materialiseSections(specs: readonly SectionSpec[]): Section[] {
+export function materializeSections(specs: readonly SectionSpec[]): Section[] {
   const starts = resolveSectionStarts(specs)
   let portNumber = 0
 

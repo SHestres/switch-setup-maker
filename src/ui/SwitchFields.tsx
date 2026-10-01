@@ -127,7 +127,7 @@ export function SwitchFields({
         </label>
         {notes}
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Sections render left → right, each centred vertically. Same-kind neighbours sit 6px apart;
+          Sections render left → right, each centered vertically. Same-kind neighbours sit 6px apart;
           different kinds 16px.
         </p>
         {action}

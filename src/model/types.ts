@@ -59,7 +59,7 @@ export interface Section {
   startMode: SectionStartMode
   /** `custom` sections pin this number; `auto` sections carry their resolved start. */
   start: number
-  /** All rows × columns ports, materialised row by row. */
+  /** All rows × columns ports, materialized row by row. */
   ports: Port[]
 }
 
