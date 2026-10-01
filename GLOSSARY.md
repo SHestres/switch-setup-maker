@@ -9,8 +9,8 @@ One modelled network-switch configuration — its switches and their connections
 _Avoid_: Project, diagram, layout
 
 **Switch**:
-A device in the setup, rendered as a faceplate and positioned on the canvas.
-_Avoid_: Device, node, box
+A switch modelled in the setup, rendered as a faceplate and positioned on the canvas.
+_Avoid_: Node, box
 
 **Faceplate**:
 The rendered front panel of a switch: sections of ports with labels.
@@ -49,8 +49,12 @@ A named, pre-built port layout offered as a starting point when adding a Switch 
 _Avoid_: Template, model preset, switch type
 
 **Connection**:
-An undirected logical link between two ports; carries the cable's attributes (colour, and later length and type).
+An undirected logical link between two Ports, or between a Port and a Device; carries the cable's attributes (colour, and later length and type).
 _Avoid_: Link, wire, edge
+
+**Device**:
+The far end of a Connection that is not a Port: something plugged into a Port that is not modelled as a Switch. Unnamed it is a generic device; otherwise it is named.
+_Avoid_: Port device, endpoint, peripheral
 
 **Cable**:
 The physical medium realising a connection; its attributes are stored on the Connection, not as a separate thing.
