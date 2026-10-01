@@ -1,6 +1,6 @@
-import { materialiseRows } from './layout'
-import type { RowSpec } from './layout'
-import type { GeneratedNumberingPreset, Switch } from './types'
+import { materialiseSections } from './layout'
+import type { SectionSpec } from './layout'
+import type { Switch } from './types'
 
 /**
  * The layout-preset gallery is data, ready for a real device library later
@@ -12,8 +12,8 @@ export interface LayoutPreset {
   label: string
   /** Prefilled model name; only the hardware entry with a named model sets it. */
   model?: string
-  numbering: GeneratedNumberingPreset
-  rows: readonly RowSpec[]
+  /** The ordered Section recipes; section order is faceplate order. */
+  sections: readonly SectionSpec[]
   /** The full layout, shown while the chip is hovered or focused. */
   details: string
 }
@@ -22,52 +22,117 @@ export const LAYOUT_PRESETS: readonly LayoutPreset[] = [
   {
     id: '24x1g-2xsfp',
     label: '24×1G + 2×SFP',
-    numbering: 'odd-top-even-bottom',
-    rows: [
-      { count: 12, kind: 'rj45', speed: '1G' },
-      { count: 12, kind: 'rj45', speed: '1G' },
-      { count: 2, kind: 'sfp', speed: '1G', numbering: 'start-over' },
+    sections: [
+      {
+        rows: 2,
+        columns: 12,
+        kind: 'rj45',
+        speed: '1G',
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+      },
+      {
+        rows: 1,
+        columns: 2,
+        kind: 'sfp',
+        speed: '1G',
+        numbering: 'sequential',
+        startMode: 'custom',
+        start: 1,
+      },
     ],
-    details:
-      '2 rows of 12 RJ45 1G ports, odd top/even bottom (1–24); 2 SFP 1G uplinks restarting at 1–2.',
+    details: '2 rows of 12 RJ45 1G ports, alternating top-first (1–24); 2 SFP 1G uplinks at 1–2.',
   },
   {
     id: 'unifi-48-port',
     label: 'Unifi 48 Port',
     model: 'Unifi 48 Port',
-    numbering: 'odd-top-even-bottom',
-    rows: [
-      { count: 24, kind: 'rj45', speed: '1G' },
-      { count: 24, kind: 'rj45', speed: '1G' },
-      { count: 4, kind: 'sfp+', speed: '10G', numbering: 'continue' },
+    sections: [
+      {
+        rows: 2,
+        columns: 8,
+        kind: 'rj45',
+        speed: '1G',
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+      },
+      {
+        rows: 2,
+        columns: 8,
+        kind: 'rj45',
+        speed: '1G',
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+      },
+      {
+        rows: 2,
+        columns: 8,
+        kind: 'rj45',
+        speed: '2.5G',
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+      },
+      {
+        rows: 2,
+        columns: 2,
+        kind: 'sfp+',
+        speed: '10G',
+        numbering: 'sequential',
+        startMode: 'auto',
+      },
     ],
     details:
-      '2 rows of 24 RJ45 1G ports, odd top/even bottom (1–48); 4 SFP+ 10G uplinks continuing at 49–52.',
+      'Three 2×8 RJ45 sections, 1G then 2.5G, alternating top-first (1–48); 4 SFP+ 10G uplinks at 49–52.',
   },
   {
     id: '24x1g-4xsfp-plus',
     label: '24×1G + 4×SFP+',
-    numbering: 'odd-top-even-bottom',
-    rows: [
-      { count: 12, kind: 'rj45', speed: '1G' },
-      { count: 12, kind: 'rj45', speed: '1G' },
-      { count: 2, kind: 'sfp+', speed: '10G', numbering: 'continue' },
-      { count: 2, kind: 'sfp+', speed: '10G', numbering: 'continue' },
+    sections: [
+      {
+        rows: 2,
+        columns: 12,
+        kind: 'rj45',
+        speed: '1G',
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+      },
+      {
+        rows: 2,
+        columns: 2,
+        kind: 'sfp+',
+        speed: '10G',
+        numbering: 'sequential',
+        startMode: 'auto',
+      },
     ],
     details:
-      '2 rows of 12 RJ45 1G ports, odd top/even bottom (1–24); a 2×2 SFP+ 10G uplink block continuing at 25–28.',
+      '2 rows of 12 RJ45 1G ports, alternating top-first (1–24); a 2×2 SFP+ 10G uplink block at 25–28.',
   },
   {
     id: '12x1g-2xsfp',
     label: '12×1G + 2×SFP',
-    numbering: 'even-top-zero-based',
-    rows: [
-      { count: 6, kind: 'rj45', speed: '1G' },
-      { count: 6, kind: 'rj45', speed: '1G' },
-      { count: 2, kind: 'sfp', speed: '1G', numbering: 'start-over' },
+    sections: [
+      {
+        rows: 2,
+        columns: 6,
+        kind: 'rj45',
+        speed: '1G',
+        numbering: 'alternating-top-first',
+        startMode: 'custom',
+        start: 0,
+      },
+      {
+        rows: 1,
+        columns: 2,
+        kind: 'sfp',
+        speed: '1G',
+        numbering: 'sequential',
+        startMode: 'custom',
+        start: 0,
+      },
     ],
     details:
-      '2 rows of 6 RJ45 1G ports, even top/zero-based (0–11); 2 SFP 1G uplinks restarting at 0–1.',
+      '2 rows of 6 RJ45 1G ports, alternating top-first zero-based (0–11); 2 SFP 1G uplinks at 0–1.',
   },
 ]
 
@@ -83,9 +148,6 @@ export function switchFromPreset(
     model: preset.model ?? '',
     x: position.x,
     y: position.y,
-    layout: {
-      numbering: preset.numbering,
-      rows: materialiseRows(preset.numbering, preset.rows),
-    },
+    layout: { sections: materialiseSections(preset.sections) },
   }
 }

@@ -1,82 +1,99 @@
-import type { RowSpec } from './layout'
-import { generateLabels, nextPortId } from './layout'
-import { findSwitch } from './document'
 import { removePorts } from './connections'
-import type { GeneratedNumberingPreset, Port, Row, Setup, SetupDocument, Switch } from './types'
+import { findSwitch } from './document'
+import { generateSectionLabels, nextPortId, resolveSectionStarts } from './layout'
+import type { SectionSpec } from './layout'
+import type { Port, Section, Setup, SetupDocument, Switch } from './types'
 
 /**
- * One row of a layout edit. `source` points at the row's index in the switch being edited,
- * or is `null` for a row appended by this edit. Rows are matched by `source`, never by order,
- * so removing a middle row never hands its ports' identities to the row below.
+ * One Section of a layout edit. `source` points at the section's index in the switch being
+ * edited, or is `null` for a section appended by this edit. Sections are matched by `source`,
+ * never by order, so removing or moving a middle section never hands its ports' identities
+ * to another section.
  */
-export interface RowEdit {
+export interface SectionEdit {
   source: number | null
-  spec: RowSpec
+  spec: SectionSpec
 }
 
 /** The complete layout a switch should have after the edit. */
 export interface LayoutEdit {
-  numbering: GeneratedNumberingPreset
-  rows: readonly RowEdit[]
+  sections: readonly SectionEdit[]
 }
 
 export interface LayoutEditPlan {
-  /** The rebuilt switch: surviving ports keep their ids, new columns get fresh ids, labels regenerate. */
+  /** The rebuilt switch: surviving ports keep their ids, new positions get fresh ids, labels regenerate. */
   switch: Switch
   /** Existing ports this edit drops; callers purge their connections. */
   removedPortIds: string[]
 }
 
 /**
- * Rebuild a switch's layout from row specs.
+ * Rebuild a switch's layout from section specs.
  *
- * Identity rules: a row keeps its ports when its `source` row survives the edit; within a row,
- * a port keeps its id when its column survives, new columns mint ids after the switch's highest
- * `p<n>`, and columns past the new count are removed. Removed rows remove all of their ports.
- * Kind, speed and labels always follow the edit; `custom` numbering is not accepted.
+ * Identity rules: a Section keeps its ports when its `source` section survives the edit;
+ * within a Section, a port keeps its id when its (row, column) survives, new positions mint
+ * ids after the switch's highest `p<n>`, and positions past the new grid are removed.
+ * Removed Sections remove all of their ports. Kind, speed, numbering, start mode and labels
+ * always follow the edit.
  */
 export function planLayoutEdit(switch_: Switch, edit: LayoutEdit): LayoutEditPlan {
-  const labels = generateLabels(
-    edit.numbering,
-    edit.rows.map((rowEdit) => rowEdit.spec),
-  )
+  const starts = resolveSectionStarts(edit.sections.map((sectionEdit) => sectionEdit.spec))
   const removedPortIds: string[] = []
 
   const keptSources = new Set(
-    edit.rows.flatMap((rowEdit) => (rowEdit.source === null ? [] : [rowEdit.source])),
+    edit.sections.flatMap((sectionEdit) =>
+      sectionEdit.source === null ? [] : [sectionEdit.source],
+    ),
   )
-  for (const [index, row] of switch_.layout.rows.entries()) {
-    if (!keptSources.has(index)) removedPortIds.push(...row.ports.map((port) => port.id))
+  for (const [index, section] of switch_.layout.sections.entries()) {
+    if (!keptSources.has(index)) removedPortIds.push(...section.ports.map((port) => port.id))
   }
 
-  let nextId = Number(nextPortId(switch_.layout.rows.flatMap((row) => row.ports)).slice(1))
-  const mintPort = (label: string, spec: RowSpec): Port => ({
+  let nextId = Number(
+    nextPortId(switch_.layout.sections.flatMap((section) => section.ports)).slice(1),
+  )
+  const mintPort = (label: string, spec: SectionSpec): Port => ({
     id: `p${nextId++}`,
     label,
     kind: spec.kind,
     speed: spec.speed,
   })
 
-  const rows: Row[] = edit.rows.map((rowEdit, index) => {
-    const sourceRow = rowEdit.source === null ? undefined : switch_.layout.rows[rowEdit.source]
-    const ports = labels[index].map((label, column) => {
-      const existing = sourceRow?.ports[column]
-      if (!existing) return mintPort(label, rowEdit.spec)
-      return { ...existing, label, kind: rowEdit.spec.kind, speed: rowEdit.spec.speed }
+  const sections: Section[] = edit.sections.map((sectionEdit, index) => {
+    const spec = sectionEdit.spec
+    const source =
+      sectionEdit.source === null ? undefined : switch_.layout.sections[sectionEdit.source]
+    const labels = generateSectionLabels(spec, starts[index]).flat()
+
+    const ports = labels.map((label, position) => {
+      const row = Math.floor(position / spec.columns)
+      const column = position % spec.columns
+      const existing =
+        source && row < source.rows && column < source.columns
+          ? source.ports[row * source.columns + column]
+          : undefined
+      if (!existing) return mintPort(label, spec)
+      return { ...existing, label, kind: spec.kind, speed: spec.speed }
     })
-    if (sourceRow) {
-      for (const port of sourceRow.ports.slice(rowEdit.spec.count)) removedPortIds.push(port.id)
+
+    if (source) {
+      const kept = new Set(ports.map((port) => port.id))
+      for (const port of source.ports) if (!kept.has(port.id)) removedPortIds.push(port.id)
     }
 
-    const row: Row = { ports }
-    if (index > 0) row.numbering = rowEdit.spec.numbering ?? 'continue'
-    return row
+    return {
+      kind: spec.kind,
+      speed: spec.speed,
+      rows: spec.rows,
+      columns: spec.columns,
+      numbering: spec.numbering,
+      startMode: spec.startMode,
+      start: starts[index],
+      ports,
+    }
   })
 
-  return {
-    switch: { ...switch_, layout: { ...switch_.layout, numbering: edit.numbering, rows } },
-    removedPortIds,
-  }
+  return { switch: { ...switch_, layout: { ...switch_.layout, sections } }, removedPortIds }
 }
 
 /** How many connections would be severed if these ports (all on `switchId`) were removed. */

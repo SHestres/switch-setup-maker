@@ -10,7 +10,7 @@ function makeSwitch(changes: Partial<Switch> = {}): Switch {
     model: '',
     x: 0,
     y: 0,
-    layout: { numbering: 'sequential', rows: [] },
+    layout: { sections: [] },
     ...changes,
   }
 }

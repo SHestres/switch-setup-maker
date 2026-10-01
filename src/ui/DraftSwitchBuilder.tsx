@@ -14,17 +14,15 @@ export function DraftSwitchBuilder({ draft, onChange, onAdd }: DraftSwitchBuilde
   return (
     <div className="flex flex-col gap-5">
       <p className="text-sm text-muted-foreground">
-        Shape the rows of the new switch; the canvas previews them live.
+        Shape the sections of the new switch; the canvas previews them live.
       </p>
       <SwitchFields
         name={draft.name}
         model={draft.model}
-        numbering={draft.numbering}
-        rows={draft.rows}
+        sections={draft.sections}
         onNameChange={(name) => onChange({ ...draft, name })}
         onModelChange={(model) => onChange({ ...draft, model })}
-        onNumberingChange={(numbering) => onChange({ ...draft, numbering })}
-        onRowsChange={(rows) => onChange({ ...draft, rows })}
+        onSectionsChange={(sections) => onChange({ ...draft, sections })}
       />
       <button
         type="button"
