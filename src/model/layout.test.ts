@@ -333,7 +333,7 @@ describe('nextPortId', () => {
   })
 
   it('ignores ids that do not follow the p<n> shape', () => {
-    const existing: Port[] = [{ id: 'uplink', label: 'U1', kind: 'sfp+', speed: '10G' }]
+    const existing: Port[] = [{ id: 'uplink', label: 'U1', kind: 'sfp', speed: '10G' }]
 
     expect(nextPortId(existing)).toBe('p1')
   })

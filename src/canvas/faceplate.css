@@ -396,8 +396,7 @@
   box-shadow: var(--led-socket);
 }
 
-.canvas-root .port.kind-sfp .connector,
-.canvas-root .port.kind-sfpp .connector {
+.canvas-root .port.kind-sfp .connector {
   top: 2px;
   bottom: 2px;
   border-color: var(--sfp-border);
@@ -437,8 +436,7 @@
   background-color: var(--connector-connected-bg);
 }
 
-.canvas-root .port.kind-sfp.connected .connector,
-.canvas-root .port.kind-sfpp.connected .connector {
+.canvas-root .port.kind-sfp.connected .connector {
   background-color: var(--sfp-connected-bg);
 }
 

@@ -99,6 +99,15 @@ function readOneOf<T extends string>(value: unknown, allowed: readonly T[], wher
   return value as T
 }
 
+/**
+ * The port kind a document may carry. `sfp+` is the pre-merge spelling of `sfp`
+ * (ADR 0002): documents written before the merge read as `sfp`, and new documents
+ * never write it, so SFP+ files stay importable without a document-version bump.
+ */
+function readPortKind(value: unknown, where: string): PortKind {
+  return readOneOf(value === 'sfp+' ? 'sfp' : value, PORT_KINDS, where)
+}
+
 function readGridSize(value: unknown, where: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
     fail(`${where} must be a whole number of at least 1.`)
@@ -195,7 +204,7 @@ function readLayout(raw: JsonObject, where: string): PortLayout {
 function readSection(value: unknown, where: string, portIds: Set<string>): Section {
   if (!isObject(value)) fail(`${where} must be an object.`)
 
-  const kind = readOneOf(value.kind, PORT_KINDS, `${where}.kind`) as PortKind
+  const kind = readPortKind(value.kind, `${where}.kind`)
   const speed = readOneOf(value.speed, PORT_SPEEDS, `${where}.speed`) as PortSpeed
   const rows = readGridSize(value.rows, `${where}.rows`)
   const columns = readGridSize(value.columns, `${where}.columns`)
@@ -255,7 +264,7 @@ function readPort(value: unknown, where: string, portIds: Set<string>): Port {
   return {
     id,
     label: readRequiredString(value.label, `${where}.label`),
-    kind: readOneOf(value.kind, PORT_KINDS, `${where}.kind`) as PortKind,
+    kind: readPortKind(value.kind, `${where}.kind`),
     speed: readOneOf(value.speed, PORT_SPEEDS, `${where}.speed`) as PortSpeed,
   }
 }

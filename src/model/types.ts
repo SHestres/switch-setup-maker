@@ -6,9 +6,9 @@
 
 export const DOCUMENT_VERSION = 2
 
-export type PortKind = 'rj45' | 'sfp' | 'sfp+'
+export type PortKind = 'rj45' | 'sfp'
 
-export const PORT_KINDS: readonly PortKind[] = ['rj45', 'sfp', 'sfp+']
+export const PORT_KINDS: readonly PortKind[] = ['rj45', 'sfp']
 
 export type PortSpeed = '100M' | '1G' | '2.5G' | '5G' | '10G'
 

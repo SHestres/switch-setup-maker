@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { resolveSectionStarts, sectionLabelRange } from '@/model/layout'
@@ -19,6 +19,9 @@ const DIMENSION_MIN = 1
 const DIMENSION_MAX = 48
 const START_MIN = 0
 const START_MAX = 100000
+
+/** How long a valid number waits for the next keystroke before it commits itself. */
+const LIVE_COMMIT_MS = 400
 
 /** What a hand-added section starts as: the presets' most common bank. */
 const NEW_SECTION: SectionSpec = {
@@ -41,7 +44,16 @@ const START_MODE_LABELS: Record<SectionStartMode, string> = {
   custom: 'Custom',
 }
 
-const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP', 'sfp+': 'SFP+' }
+const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP' }
+
+/**
+ * How a section edit should be applied. `live` marks a debounced commit made while a
+ * number field still holds focus: the app applies it only when it severs nothing, so no
+ * confirm dialog can interrupt typing. Blur and Enter commit without `live`.
+ */
+export interface SectionEditOptions {
+  live?: boolean
+}
 
 export interface SwitchFieldsProps {
   name: string
@@ -49,7 +61,7 @@ export interface SwitchFieldsProps {
   sections: readonly SectionEdit[]
   onNameChange: (name: string) => void
   onModelChange: (model: string) => void
-  onSectionsChange: (sections: SectionEdit[]) => void
+  onSectionsChange: (sections: SectionEdit[], options?: SectionEditOptions) => void
   /** Mode-specific copy under the identity fields. */
   notes?: ReactNode
   /** The mode's action, e.g. `Add switch` or `Delete switch`. */
@@ -73,11 +85,16 @@ export function SwitchFields({
 }: SwitchFieldsProps) {
   const starts = resolveSectionStarts(sections.map((section) => section.spec))
 
-  const changeSection = (index: number, changes: Partial<SectionSpec>) =>
+  const changeSection = (
+    index: number,
+    changes: Partial<SectionSpec>,
+    options?: SectionEditOptions,
+  ) =>
     onSectionsChange(
       sections.map((section, sectionIndex) =>
         sectionIndex === index ? { ...section, spec: { ...section.spec, ...changes } } : section,
       ),
+      options,
     )
 
   const changeStartMode = (index: number, startMode: SectionStartMode) => {
@@ -127,8 +144,8 @@ export function SwitchFields({
         </label>
         {notes}
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Sections render left → right, each centered vertically. Same-kind neighbours sit 6px apart;
-          different kinds 16px.
+          Sections render left → right, each centered vertically. Same-kind neighbours sit 6px
+          apart; different kinds 16px.
         </p>
         {action}
       </div>
@@ -142,7 +159,7 @@ export function SwitchFields({
             start={starts[index]}
             last={index === sections.length - 1}
             removable={sections.length > 1}
-            onSpecChange={(changes) => changeSection(index, changes)}
+            onSpecChange={(changes, options) => changeSection(index, changes, options)}
             onStartModeChange={(startMode) => changeStartMode(index, startMode)}
             onMoveLeft={() => moveSection(index, -1)}
             onMoveRight={() => moveSection(index, 1)}
@@ -168,7 +185,7 @@ interface SectionCardProps {
   start: number
   last: boolean
   removable: boolean
-  onSpecChange: (changes: Partial<SectionSpec>) => void
+  onSpecChange: (changes: Partial<SectionSpec>, options?: SectionEditOptions) => void
   onStartModeChange: (startMode: SectionStartMode) => void
   onMoveLeft: () => void
   onMoveRight: () => void
@@ -205,7 +222,7 @@ function SectionCard({
           value={spec.rows}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
-          onCommit={(rows) => onSpecChange({ rows })}
+          onCommit={(rows, live) => onSpecChange({ rows }, { live })}
         />
         <NumberField
           label={`Section ${sectionNumber} columns`}
@@ -213,7 +230,7 @@ function SectionCard({
           value={spec.columns}
           min={DIMENSION_MIN}
           max={DIMENSION_MAX}
-          onCommit={(columns) => onSpecChange({ columns })}
+          onCommit={(columns, live) => onSpecChange({ columns }, { live })}
         />
         <SelectField
           label={`Section ${sectionNumber} port kind`}
@@ -259,7 +276,7 @@ function SectionCard({
             min={START_MIN}
             max={START_MAX}
             disabled={spec.startMode !== 'custom'}
-            onCommit={(value) => onSpecChange({ start: value })}
+            onCommit={(value, live) => onSpecChange({ start: value }, { live })}
           />
         </div>
       </div>
@@ -344,12 +361,16 @@ interface NumberFieldProps {
   min: number
   max: number
   disabled?: boolean
-  onCommit: (value: number) => void
+  /** `live` marks the debounced commit; blur and Enter commit without it. */
+  onCommit: (value: number, live: boolean) => void
 }
 
 /**
- * A number is committed on blur or Enter, not per keystroke: "2" on the way to "24" is a
- * different layout, and each invalid or intermediate value must never reach the document.
+ * A number commits itself once typing pauses, and immediately on blur or Enter. The
+ * pause keeps a valid "2" on the way to "24" from reaching the document; invalid or
+ * intermediate values never commit. A live commit carries `live` so the app can skip
+ * it when it would sever connections — that edit waits for blur/Enter, where the
+ * confirm belongs.
  */
 function NumberField({
   label,
@@ -367,8 +388,23 @@ function NumberField({
   const parsed = /^\d+$/.test(shown.trim()) ? Number(shown) : null
   const invalid = parsed === null || parsed < min || parsed > max
 
+  // The debounce effect reads the callback through a ref so parent re-renders refresh it
+  // without restarting the timer.
+  const commitRef = useRef(onCommit)
+  useEffect(() => {
+    commitRef.current = onCommit
+  })
+
+  useEffect(() => {
+    if (draft === null || parsed === null || parsed < min || parsed > max || parsed === value) {
+      return
+    }
+    const timer = setTimeout(() => commitRef.current(parsed, true), LIVE_COMMIT_MS)
+    return () => clearTimeout(timer)
+  }, [draft, parsed, min, max, value])
+
   const commit = () => {
-    if (!invalid && parsed !== value) onCommit(parsed)
+    if (!invalid && parsed !== null && parsed !== value) onCommit(parsed, false)
     setDraft(null)
   }
 

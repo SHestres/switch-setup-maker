@@ -2,12 +2,16 @@ import type { LayoutEdit, SectionEdit } from '@/model/layoutEdit'
 import type { Switch } from '@/model/types'
 
 import { SwitchFields } from './SwitchFields'
+import type { SectionEditOptions } from './SwitchFields'
 
 export interface SwitchEditorProps {
   switch_: Switch
   onChange: (changes: { name?: string; model?: string }) => void
-  /** A valid layout edit; the app decides whether it needs confirming first. */
-  onLayoutEdit: (edit: LayoutEdit) => void
+  /**
+   * A valid layout edit; the app decides whether it needs confirming first. `live` marks a
+   * debounced commit: the app applies it only when it severs nothing.
+   */
+  onLayoutEdit: (edit: LayoutEdit, options?: SectionEditOptions) => void
   onDelete: () => void
 }
 
@@ -40,7 +44,7 @@ export function SwitchEditor({ switch_, onChange, onLayoutEdit, onDelete }: Swit
       sections={editableSections(switch_)}
       onNameChange={(name) => onChange({ name })}
       onModelChange={(model) => onChange({ model })}
-      onSectionsChange={(sections) => onLayoutEdit({ sections })}
+      onSectionsChange={(sections, options) => onLayoutEdit({ sections }, options)}
       action={
         <button
           type="button"

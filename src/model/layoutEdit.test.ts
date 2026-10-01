@@ -140,7 +140,7 @@ describe('planLayoutEdit', () => {
         sections: [
           {
             source: 0,
-            spec: spec({ numbering: 'sequential', kind: 'sfp+', speed: '10G' }),
+            spec: spec({ numbering: 'sequential', kind: 'sfp', speed: '10G' }),
           },
         ],
       }),
@@ -154,7 +154,7 @@ describe('planLayoutEdit', () => {
       'p4',
     ])
     expect(plan.switch.layout.sections[0].ports[0]).toMatchObject({
-      kind: 'sfp+',
+      kind: 'sfp',
       speed: '10G',
       label: '1',
     })
