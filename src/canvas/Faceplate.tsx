@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { MouseEvent } from 'react'
 
+import { sectionRows } from '@/model/layout'
 import { switchLabel } from '@/model/document'
 import type { Port, PortRef, Row, Switch } from '@/model/types'
 
@@ -36,7 +37,7 @@ export function Faceplate({
   onClick,
   onPortClick,
 }: FaceplateProps) {
-  const banks = splitBanks(switch_.layout.rows)
+  const banks = splitBanks(switch_.layout.sections.flatMap(sectionRows))
   const name = switchLabel(switch_)
 
   return (

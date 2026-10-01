@@ -1,4 +1,4 @@
-import type { LayoutEdit, RowEdit } from '@/model/layoutEdit'
+import type { LayoutEdit, SectionEdit } from '@/model/layoutEdit'
 import type { Switch } from '@/model/types'
 
 import { SwitchFields } from './SwitchFields'
@@ -11,42 +11,37 @@ export interface SwitchEditorProps {
   onDelete: () => void
 }
 
-function editableRows(switch_: Switch): RowEdit[] {
-  return switch_.layout.rows.map((row, index) => ({
+function editableSections(switch_: Switch): SectionEdit[] {
+  return switch_.layout.sections.map((section, index) => ({
     source: index,
     spec: {
-      count: row.ports.length,
-      kind: row.ports[0].kind,
-      speed: row.ports[0].speed,
-      ...(index > 0 ? { numbering: row.numbering ?? 'continue' } : {}),
+      rows: section.rows,
+      columns: section.columns,
+      kind: section.kind,
+      speed: section.speed,
+      numbering: section.numbering,
+      startMode: section.startMode,
+      start: section.start,
     },
   }))
 }
 
 /**
- * The full editor for a selected switch: identity, numbering preset, rows and delete.
- * Every change is a complete `LayoutEdit` request; the app commits it, confirming first
- * when it would sever connections. The fields themselves are shared with the draft builder.
+ * The full editor for a selected switch: identity, sections and delete.
+ * Every layout change is a complete `LayoutEdit` request; the app commits it, confirming
+ * first when it would sever connections. The fields themselves are shared with the draft
+ * builder.
  */
 export function SwitchEditor({ switch_, onChange, onLayoutEdit, onDelete }: SwitchEditorProps) {
-  const rows = editableRows(switch_)
-
-  const commitRows = (next: RowEdit[]) => {
-    if (switch_.layout.numbering === 'custom') return
-    onLayoutEdit({ numbering: switch_.layout.numbering, rows: next })
-  }
-
   return (
     <div className="flex flex-col gap-5">
       <SwitchFields
         name={switch_.name}
         model={switch_.model}
-        numbering={switch_.layout.numbering}
-        rows={rows}
+        sections={editableSections(switch_)}
         onNameChange={(name) => onChange({ name })}
         onModelChange={(model) => onChange({ model })}
-        onNumberingChange={(numbering) => onLayoutEdit({ numbering, rows })}
-        onRowsChange={commitRows}
+        onSectionsChange={(sections) => onLayoutEdit({ sections })}
       />
 
       <button

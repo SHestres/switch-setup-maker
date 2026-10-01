@@ -57,11 +57,11 @@ describe('import', () => {
   it('names the first problem in an error dialog for an invalid file', async () => {
     render(<App />)
 
-    importFile(new File(['{"version": 2}'], 'setup.json', { type: 'application/json' }))
+    importFile(new File(['{"version": 3}'], 'setup.json', { type: 'application/json' }))
 
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent('Import failed')
-    expect(dialog).toHaveTextContent(/version 2/)
+    expect(dialog).toHaveTextContent(/version 3/)
   })
 
   it('asks before replacing a non-empty setup and keeps it on cancel', async () => {
@@ -280,9 +280,14 @@ function storedSwitches(): Array<Record<string, unknown>> {
 interface PresetCase {
   chip: string
   layout: {
-    numbering: string
-    rows: Array<{
-      numbering?: string
+    sections: Array<{
+      kind: string
+      speed: string
+      rows: number
+      columns: number
+      numbering: string
+      startMode: string
+      start: number
       ports: Array<{ id: string; label: string; kind: string; speed: string }>
     }>
   }
@@ -296,137 +301,166 @@ const PRESET_LAYOUTS: PresetCase[] = [
   {
     chip: '24×1G + 2×SFP',
     layout: {
-      numbering: 'odd-top-even-bottom',
-      rows: [
+      sections: [
         {
-          ports: ports(
-            1,
-            ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
-            'rj45',
-            '1G',
-          ),
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          columns: 12,
+          numbering: 'alternating-top-first',
+          startMode: 'auto',
+          start: 1,
+          ports: [
+            ...ports(
+              1,
+              ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
+              'rj45',
+              '1G',
+            ),
+            ...ports(
+              13,
+              ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
+              'rj45',
+              '1G',
+            ),
+          ],
         },
         {
-          ports: ports(
-            13,
-            ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
-            'rj45',
-            '1G',
-          ),
+          kind: 'sfp',
+          speed: '1G',
+          rows: 1,
+          columns: 2,
+          numbering: 'sequential',
+          startMode: 'custom',
+          start: 1,
+          ports: ports(25, ['1', '2'], 'sfp', '1G'),
         },
-        { numbering: 'start-over', ports: ports(25, ['1', '2'], 'sfp', '1G') },
       ],
     },
   },
   {
     chip: 'Unifi 48 Port',
     layout: {
-      numbering: 'odd-top-even-bottom',
-      rows: [
+      sections: [
         {
-          ports: ports(
-            1,
-            [
-              '1',
-              '3',
-              '5',
-              '7',
-              '9',
-              '11',
-              '13',
-              '15',
-              '17',
-              '19',
-              '21',
-              '23',
-              '25',
-              '27',
-              '29',
-              '31',
-              '33',
-              '35',
-              '37',
-              '39',
-              '41',
-              '43',
-              '45',
-              '47',
-            ],
-            'rj45',
-            '1G',
-          ),
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          columns: 8,
+          numbering: 'alternating-top-first',
+          startMode: 'auto',
+          start: 1,
+          ports: [
+            ...ports(1, ['1', '3', '5', '7', '9', '11', '13', '15'], 'rj45', '1G'),
+            ...ports(9, ['2', '4', '6', '8', '10', '12', '14', '16'], 'rj45', '1G'),
+          ],
         },
         {
-          ports: ports(
-            25,
-            [
-              '2',
-              '4',
-              '6',
-              '8',
-              '10',
-              '12',
-              '14',
-              '16',
-              '18',
-              '20',
-              '22',
-              '24',
-              '26',
-              '28',
-              '30',
-              '32',
-              '34',
-              '36',
-              '38',
-              '40',
-              '42',
-              '44',
-              '46',
-              '48',
-            ],
-            'rj45',
-            '1G',
-          ),
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          columns: 8,
+          numbering: 'alternating-top-first',
+          startMode: 'auto',
+          start: 17,
+          ports: [
+            ...ports(17, ['17', '19', '21', '23', '25', '27', '29', '31'], 'rj45', '1G'),
+            ...ports(25, ['18', '20', '22', '24', '26', '28', '30', '32'], 'rj45', '1G'),
+          ],
         },
-        { numbering: 'continue', ports: ports(49, ['49', '50', '51', '52'], 'sfp+', '10G') },
+        {
+          kind: 'rj45',
+          speed: '2.5G',
+          rows: 2,
+          columns: 8,
+          numbering: 'alternating-top-first',
+          startMode: 'auto',
+          start: 33,
+          ports: [
+            ...ports(33, ['33', '35', '37', '39', '41', '43', '45', '47'], 'rj45', '2.5G'),
+            ...ports(41, ['34', '36', '38', '40', '42', '44', '46', '48'], 'rj45', '2.5G'),
+          ],
+        },
+        {
+          kind: 'sfp+',
+          speed: '10G',
+          rows: 2,
+          columns: 2,
+          numbering: 'sequential',
+          startMode: 'auto',
+          start: 49,
+          ports: ports(49, ['49', '50', '51', '52'], 'sfp+', '10G'),
+        },
       ],
     },
   },
   {
     chip: '24×1G + 4×SFP+',
     layout: {
-      numbering: 'odd-top-even-bottom',
-      rows: [
+      sections: [
         {
-          ports: ports(
-            1,
-            ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
-            'rj45',
-            '1G',
-          ),
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          columns: 12,
+          numbering: 'alternating-top-first',
+          startMode: 'auto',
+          start: 1,
+          ports: [
+            ...ports(
+              1,
+              ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23'],
+              'rj45',
+              '1G',
+            ),
+            ...ports(
+              13,
+              ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
+              'rj45',
+              '1G',
+            ),
+          ],
         },
         {
-          ports: ports(
-            13,
-            ['2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'],
-            'rj45',
-            '1G',
-          ),
+          kind: 'sfp+',
+          speed: '10G',
+          rows: 2,
+          columns: 2,
+          numbering: 'sequential',
+          startMode: 'auto',
+          start: 25,
+          ports: ports(25, ['25', '26', '27', '28'], 'sfp+', '10G'),
         },
-        { numbering: 'continue', ports: ports(25, ['25', '27'], 'sfp+', '10G') },
-        { numbering: 'continue', ports: ports(27, ['26', '28'], 'sfp+', '10G') },
       ],
     },
   },
   {
     chip: '12×1G + 2×SFP',
     layout: {
-      numbering: 'even-top-zero-based',
-      rows: [
-        { ports: ports(1, ['0', '2', '4', '6', '8', '10'], 'rj45', '1G') },
-        { ports: ports(7, ['1', '3', '5', '7', '9', '11'], 'rj45', '1G') },
-        { numbering: 'start-over', ports: ports(13, ['0', '1'], 'sfp', '1G') },
+      sections: [
+        {
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          columns: 6,
+          numbering: 'alternating-top-first',
+          startMode: 'custom',
+          start: 0,
+          ports: [
+            ...ports(1, ['0', '2', '4', '6', '8', '10'], 'rj45', '1G'),
+            ...ports(7, ['1', '3', '5', '7', '9', '11'], 'rj45', '1G'),
+          ],
+        },
+        {
+          kind: 'sfp',
+          speed: '1G',
+          rows: 1,
+          columns: 2,
+          numbering: 'sequential',
+          startMode: 'custom',
+          start: 0,
+          ports: ports(13, ['0', '1'], 'sfp', '1G'),
+        },
       ],
     },
   },
@@ -556,7 +590,7 @@ describe('add switch', () => {
 
     await user.hover(chip)
 
-    expect(within(inspector()).getByText(/2 rows of 24 RJ45 1G ports/)).toBeInTheDocument()
+    expect(within(inspector()).getByText(/Three 2×8 RJ45 sections/)).toBeInTheDocument()
     expect(within(inspector()).getByText(/49–52/)).toBeInTheDocument()
 
     await user.unhover(chip)
@@ -750,9 +784,14 @@ describe('wires', () => {
 })
 
 interface StoredLayout {
-  numbering: string
-  rows: Array<{
-    numbering?: string
+  sections: Array<{
+    kind: string
+    speed: string
+    rows: number
+    columns: number
+    numbering: string
+    startMode: string
+    start: number
     ports: Array<{ id: string; label: string; kind: string; speed: string }>
   }>
 }
@@ -790,109 +829,74 @@ function openCoreEditor(): void {
 }
 
 describe('switch layout editor', () => {
-  it('shows the row controls for the selected switch and autosaves a count change live', () => {
+  it('shows the section controls for the selected switch and autosaves a column change live', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
 
     openCoreEditor()
     const panel = inspector()
-    expect(within(panel).getByLabelText('Port numbering')).toHaveValue('odd-top-even-bottom')
-    expect(within(panel).getByLabelText('Row 1 port count')).toHaveValue(2)
-    expect(within(panel).getByLabelText('Row 1 port kind')).toHaveValue('rj45')
-    expect(within(panel).getByLabelText('Row 1 port speed')).toHaveValue('1G')
-    expect(within(panel).queryByLabelText('Row 1 numbering')).not.toBeInTheDocument()
-    expect(within(panel).getByLabelText('Row 2 port count')).toHaveValue(1)
-    expect(within(panel).getByLabelText('Row 2 port kind')).toHaveValue('sfp+')
-    expect(within(panel).getByLabelText('Row 2 numbering')).toHaveValue('start-over')
+    expect(within(panel).getByLabelText('Section 1 rows')).toHaveValue(1)
+    expect(within(panel).getByLabelText('Section 1 columns')).toHaveValue(2)
+    expect(within(panel).getByLabelText('Section 1 port kind')).toHaveValue('rj45')
+    expect(within(panel).getByLabelText('Section 1 port speed')).toHaveValue('1G')
+    expect(within(panel).getByLabelText('Section 1 numbering')).toHaveValue('alternating-top-first')
+    expect(within(panel).getByLabelText('Section 1 start mode')).toHaveValue('auto')
+    expect(within(panel).getByLabelText('Section 1 start number')).toHaveValue(1)
+    expect(within(panel).getByLabelText('Section 1 start number')).toBeDisabled()
+    expect(within(panel).getByLabelText('Section 2 port kind')).toHaveValue('sfp+')
+    expect(within(panel).getByLabelText('Section 2 numbering')).toHaveValue('sequential')
+    expect(within(panel).getByLabelText('Section 2 start mode')).toHaveValue('custom')
+    expect(within(panel).getByLabelText('Section 2 start number')).toHaveValue(1)
+    expect(within(panel).getByLabelText('Section 2 start number')).toBeEnabled()
 
-    fireEvent.change(within(panel).getByLabelText('Row 1 port count'), { target: { value: '3' } })
-    fireEvent.blur(within(panel).getByLabelText('Row 1 port count'))
+    fireEvent.change(within(panel).getByLabelText('Section 1 columns'), { target: { value: '3' } })
+    fireEvent.blur(within(panel).getByLabelText('Section 1 columns'))
 
-    // A lone top row numbers sequentially; the start-over SFP row stays 1. The new port mints p50.
-    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'SFP+ port 1 (10G) on Core' })).toBeInTheDocument()
-    expect(storedLayout().rows[0].ports.map((port) => port.label)).toEqual(['1', '2', '3'])
-    expect(storedLayout().rows[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p50'])
+    // A one-row alternating section numbers 1, 3, 5; the new column mints p50.
+    expect(screen.getByRole('button', { name: 'RJ45 port 5 (1G) on Core' })).toBeInTheDocument()
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['1', '3', '5'])
+    expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p50'])
   })
 
-  it('marks an out-of-range count inline and never commits it', () => {
+  it('marks an out-of-range dimension inline and never commits it', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
-    const count = within(panel).getByLabelText('Row 1 port count')
+    const columns = within(panel).getByLabelText('Section 1 columns')
 
-    fireEvent.change(count, { target: { value: '49' } })
+    fireEvent.change(columns, { target: { value: '49' } })
 
-    expect(count).toHaveAttribute('aria-invalid', 'true')
+    expect(columns).toHaveAttribute('aria-invalid', 'true')
     expect(within(panel).getByText('Enter a whole number from 1 to 48.')).toBeInTheDocument()
-    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
 
-    fireEvent.blur(count)
+    fireEvent.blur(columns)
 
-    expect(count).toHaveValue(2)
-    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    expect(columns).toHaveValue(2)
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
 
-    fireEvent.change(count, { target: { value: '0' } })
-    expect(count).toHaveAttribute('aria-invalid', 'true')
-    fireEvent.keyDown(count, { key: 'Enter' })
-    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    fireEvent.change(columns, { target: { value: '0' } })
+    expect(columns).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.keyDown(columns, { key: 'Enter' })
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
   })
 
-  it('moves a row’s numbering default with its kind, and keeps an explicit override', () => {
-    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
-    render(<App />)
-    openCoreEditor()
-    const panel = inspector()
-    const kind = within(panel).getByLabelText('Row 2 port kind')
-    const numbering = within(panel).getByLabelText('Row 2 numbering')
-
-    fireEvent.change(kind, { target: { value: 'rj45' } })
-
-    expect(numbering).toHaveValue('continue')
-    expect(storedLayout().rows[1].ports[0]).toMatchObject({ kind: 'rj45' })
-    expect(storedLayout().rows[1].ports[0].label).toBe('2')
-
-    fireEvent.change(kind, { target: { value: 'sfp+' } })
-
-    expect(numbering).toHaveValue('start-over')
-
-    fireEvent.change(numbering, { target: { value: 'continue' } })
-    fireEvent.change(kind, { target: { value: 'sfp' } })
-
-    expect(numbering).toHaveValue('continue')
-    expect(storedLayout().rows[1].numbering).toBe('continue')
-  })
-
-  it('edits a row’s speed and regenerates its port labels live', () => {
+  it('changes a section’s numbering convention, relabelling it and keeping connections', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
 
-    fireEvent.change(within(panel).getByLabelText('Row 2 port speed'), { target: { value: '1G' } })
-
-    expect(screen.getByRole('button', { name: 'SFP+ port 1 (1G) on Core' })).toBeInTheDocument()
-    expect(storedLayout().rows[1].ports[0].speed).toBe('1G')
-  })
-
-  it('changes the whole numbering preset, relabelling every row and keeping connections', () => {
-    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
-    render(<App />)
-    openCoreEditor()
-    const panel = inspector()
-
-    fireEvent.change(within(panel).getByLabelText('Port numbering'), {
+    fireEvent.change(within(panel).getByLabelText('Section 1 numbering'), {
       target: { value: 'sequential' },
     })
 
-    expect(storedLayout().numbering).toBe('sequential')
-    expect(storedLayout().rows.map((row) => row.ports.map((port) => port.label))).toEqual([
-      ['1', '2'],
-      ['1'],
-    ])
+    expect(storedLayout().sections[0].numbering).toBe('sequential')
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['1', '2'])
+    // A pinned custom section after it stays put.
+    expect(storedLayout().sections[1].start).toBe(1)
     expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
 
     const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
@@ -900,53 +904,139 @@ describe('switch layout editor', () => {
     expect(stored.setup.connections[0].a).toEqual({ switch: 'sw1', port: 'p1' })
   })
 
-  it('appends a row with fresh ports, default numbering and autosave, without a confirm', () => {
+  it('supports alternating bottom first', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
 
-    fireEvent.click(within(panel).getByRole('button', { name: 'Add row' }))
+    fireEvent.change(within(panel).getByLabelText('Section 1 numbering'), {
+      target: { value: 'alternating-bottom-first' },
+    })
 
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    const appended = storedLayout().rows[2]
-    expect(appended.numbering).toBe('continue')
-    expect(appended.ports).toHaveLength(12)
-    expect(appended.ports[0]).toMatchObject({ id: 'p50', kind: 'rj45', speed: '1G' })
-    expect(appended.ports[11]).toMatchObject({ id: 'p61', label: '13' })
-    expect(within(panel).getByLabelText('Row 3 port count')).toHaveValue(12)
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['2', '4'])
+    expect(screen.getByRole('button', { name: 'RJ45 port 4 (1G) on Core' })).toBeInTheDocument()
   })
 
-  it('removes an unconnected row immediately and never lets the last row go', () => {
+  it('pins a custom start only when the user asks for one', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+    const startMode = within(panel).getByLabelText('Section 1 start mode')
+    const startNumber = within(panel).getByLabelText('Section 1 start number')
+
+    fireEvent.change(startMode, { target: { value: 'custom' } })
+
+    expect(startNumber).toBeEnabled()
+    expect(startNumber).toHaveValue(1)
+
+    fireEvent.change(startNumber, { target: { value: '0' } })
+    fireEvent.blur(startNumber)
+
+    expect(storedLayout().sections[0].startMode).toBe('custom')
+    expect(storedLayout().sections[0].start).toBe(0)
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['0', '2'])
+  })
+
+  it('flips a section to Auto so it chains after the previous highest label', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
 
-    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 2' }))
+    fireEvent.change(within(panel).getByLabelText('Section 2 start mode'), {
+      target: { value: 'auto' },
+    })
+
+    expect(storedLayout().sections[1].startMode).toBe('auto')
+    expect(storedLayout().sections[1].start).toBe(4)
+    expect(screen.getByRole('button', { name: 'SFP+ port 4 (10G) on Core' })).toBeInTheDocument()
+  })
+
+  it('edits a section’s speed and regenerates its port labels live', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.change(within(panel).getByLabelText('Section 2 port speed'), {
+      target: { value: '1G' },
+    })
+
+    expect(screen.getByRole('button', { name: 'SFP+ port 1 (1G) on Core' })).toBeInTheDocument()
+    expect(storedLayout().sections[1].speed).toBe('1G')
+  })
+
+  it('appends a section with fresh ports and an auto start, without a confirm', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add section' }))
 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-    expect(storedLayout().rows).toHaveLength(1)
+    const appended = storedLayout().sections[2]
+    // The pinned SFP+ section tops out at 1, so the new auto section starts at 2.
+    expect(appended).toMatchObject({
+      rows: 2,
+      columns: 8,
+      kind: 'rj45',
+      speed: '1G',
+      numbering: 'alternating-top-first',
+      startMode: 'auto',
+      start: 2,
+    })
+    expect(appended.ports).toHaveLength(16)
+    expect(appended.ports[0]).toMatchObject({ id: 'p50', label: '2' })
+    expect(appended.ports[15]).toMatchObject({ id: 'p65', label: '17' })
+    expect(within(panel).getByLabelText('Section 3 columns')).toHaveValue(8)
+  })
+
+  it('moves a section left or right, keeping its ports and connections', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move section 2 left' }))
+
+    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['sfp+', 'rj45'])
+    expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p49'])
+    expect(storedConnections()).toHaveLength(1)
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move section 1 right' }))
+
+    expect(storedLayout().sections.map((section) => section.kind)).toEqual(['rj45', 'sfp+'])
+  })
+
+  it('removes an unconnected section immediately and never lets the last section go', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const panel = inspector()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove section 2' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().sections).toHaveLength(1)
     expect(
       screen.queryByRole('button', { name: 'SFP+ port 1 (10G) on Core' }),
     ).not.toBeInTheDocument()
-    // A lone row numbers sequentially again: 1 and 2.
-    expect(screen.getByRole('button', { name: 'RJ45 port 2 (1G) on Core' })).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: 'Remove row 1' })).toBeDisabled()
-    expect(
-      JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').setup.connections,
-    ).toHaveLength(1)
+    expect(within(panel).getByRole('button', { name: 'Remove section 1' })).toBeDisabled()
+    expect(storedConnections()).toHaveLength(1)
   })
 
-  it('confirms a count that would sever a connection, and can cancel it', async () => {
+  it('confirms a shrink that would sever a connection, and can cancel it', async () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
-    const count = within(panel).getByLabelText('Row 1 port count')
+    const columns = within(panel).getByLabelText('Section 1 columns')
 
-    fireEvent.change(count, { target: { value: '1' } })
-    fireEvent.blur(count)
+    fireEvent.change(columns, { target: { value: '1' } })
+    fireEvent.blur(columns)
 
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent('Change layout?')
@@ -954,55 +1044,55 @@ describe('switch layout editor', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
-    expect(count).toHaveValue(2)
-    expect(storedLayout().rows[0].ports).toHaveLength(2)
+    expect(columns).toHaveValue(2)
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
     expect(storedConnections()).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'RJ45 port 3 (1G) on Core' })).toBeInTheDocument()
   })
 
-  it('severs the connections and autosaves once the count change is confirmed', async () => {
+  it('severs the connections and autosaves once the shrink is confirmed', async () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
     render(<App />)
     openCoreEditor()
-    const count = within(screen.getByRole('complementary')).getByLabelText('Row 1 port count')
+    const columns = within(screen.getByRole('complementary')).getByLabelText('Section 1 columns')
 
-    fireEvent.change(count, { target: { value: '1' } })
-    fireEvent.blur(count)
+    fireEvent.change(columns, { target: { value: '1' } })
+    fireEvent.blur(columns)
     const dialog = await screen.findByRole('alertdialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }))
 
-    expect(storedLayout().rows[0].ports.map((port) => port.id)).toEqual(['p1'])
+    expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1'])
     expect(storedConnections()).toEqual([
       { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p2' } },
     ])
     expect(
       screen.queryByRole('button', { name: 'RJ45 port 3 (1G) on Core' }),
     ).not.toBeInTheDocument()
-    expect(count).toHaveValue(1)
+    expect(columns).toHaveValue(1)
   })
 
-  it('confirms a row removal naming the switch and the connections to sever', async () => {
+  it('confirms a section removal naming the switch and the connections to sever', async () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
     render(<App />)
     openCoreEditor()
     const panel = inspector()
 
-    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 1' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove section 1' }))
 
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent('Change layout?')
     expect(dialog).toHaveTextContent('Applying this change to Core severs 2 connections.')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
-    expect(storedLayout().rows).toHaveLength(2)
+    expect(storedLayout().sections).toHaveLength(2)
     expect(storedConnections()).toHaveLength(2)
 
-    fireEvent.click(within(panel).getByRole('button', { name: 'Remove row 1' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Remove section 1' }))
     fireEvent.click(
       within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Apply' }),
     )
 
-    expect(storedLayout().rows).toHaveLength(1)
-    expect(storedLayout().rows[0].ports[0].id).toBe('p49')
+    expect(storedLayout().sections).toHaveLength(1)
+    expect(storedLayout().sections[0].ports[0].id).toBe('p49')
     expect(storedConnections()).toEqual([])
   })
 
@@ -1245,7 +1335,7 @@ describe('draft switch', () => {
     expect(storedSwitches()).toHaveLength(0)
   })
 
-  it('live-previews the rows being built while keeping the draft out of the document and storage', () => {
+  it('live-previews the sections being built while keeping the draft out of the document and storage', () => {
     render(<App />)
     startBlank()
     const add = within(inspector()).getByRole('button', { name: 'Add switch' })
@@ -1253,22 +1343,22 @@ describe('draft switch', () => {
     expect(add).toBeDisabled()
     expect(storedSwitches()).toHaveLength(0)
 
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
 
     const preview = ghost()
-    expect(within(preview).getByText('12')).toBeInTheDocument()
-    expect(within(preview).queryByText('13')).not.toBeInTheDocument()
+    expect(within(preview).getByText('15')).toBeInTheDocument()
+    expect(within(preview).queryByText('17')).not.toBeInTheDocument()
     // The previewed ports stay decorative: nothing to click, wire or focus.
     expect(within(preview).queryAllByRole('button')).toHaveLength(0)
     expect(add).toBeEnabled()
     expect(storedSwitches()).toHaveLength(0)
 
-    const count = within(inspector()).getByLabelText('Row 1 port count')
-    fireEvent.change(count, { target: { value: '4' } })
-    fireEvent.blur(count)
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+    fireEvent.change(columns, { target: { value: '4' } })
+    fireEvent.blur(columns)
 
-    expect(within(preview).getByText('4')).toBeInTheDocument()
-    expect(within(preview).queryByText('5')).not.toBeInTheDocument()
+    expect(within(preview).getByText('7')).toBeInTheDocument()
+    expect(within(preview).queryByText('9')).not.toBeInTheDocument()
 
     fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
     fireEvent.change(within(inspector()).getByLabelText('Model'), {
@@ -1286,15 +1376,20 @@ describe('draft switch', () => {
     render(<App />)
     startBlank()
 
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
     fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
-    fireEvent.change(within(inspector()).getByLabelText('Model'), { target: { value: 'USW-24' } })
-    fireEvent.change(within(inspector()).getByLabelText('Port numbering'), {
+    fireEvent.change(within(inspector()).getByLabelText('Model'), {
+      target: { value: 'USW-24' },
+    })
+    fireEvent.change(within(inspector()).getByLabelText('Section 1 numbering'), {
       target: { value: 'sequential' },
     })
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
-    const count = within(inspector()).getByLabelText('Row 1 port count')
-    fireEvent.change(count, { target: { value: '4' } })
-    fireEvent.blur(count)
+    const rows = within(inspector()).getByLabelText('Section 1 rows')
+    fireEvent.change(rows, { target: { value: '1' } })
+    fireEvent.blur(rows)
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+    fireEvent.change(columns, { target: { value: '4' } })
+    fireEvent.blur(columns)
 
     fireEvent.click(within(inspector()).getByRole('button', { name: 'Add switch' }))
 
@@ -1310,9 +1405,15 @@ describe('draft switch', () => {
       y: 355.5,
     })
     expect(storedLayout()).toEqual({
-      numbering: 'sequential',
-      rows: [
+      sections: [
         {
+          kind: 'rj45',
+          speed: '1G',
+          rows: 1,
+          columns: 4,
+          numbering: 'sequential',
+          startMode: 'auto',
+          start: 1,
           ports: [
             { id: 'p1', label: '1', kind: 'rj45', speed: '1G' },
             { id: 'p2', label: '2', kind: 'rj45', speed: '1G' },
@@ -1365,7 +1466,7 @@ describe('draft switch', () => {
   it('asks before discarding an edited draft and keeps it on cancel', async () => {
     render(<App />)
     startBlank()
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
     fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
 
     fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
@@ -1392,7 +1493,7 @@ describe('draft switch', () => {
   it('asks before replacing an edited draft with the gallery', async () => {
     render(<App />)
     startBlank()
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
 
@@ -1418,7 +1519,7 @@ describe('draft switch', () => {
   it('cancels the discard confirm with Escape and keeps the draft', async () => {
     render(<App />)
     startBlank()
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
     fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
     const dialog = await screen.findByRole('alertdialog')
 
@@ -1447,7 +1548,7 @@ describe('draft switch', () => {
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
     render(<App />)
     startBlank()
-    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add row' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Add section' }))
     fireEvent.change(within(inspector()).getByLabelText('Name'), { target: { value: 'Rack A' } })
 
     fireEvent.click(screen.getByRole('group', { name: 'Core' }))

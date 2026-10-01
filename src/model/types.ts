@@ -1,9 +1,10 @@
 /**
  * The single versioned document that autosave and JSON files share.
- * Shape and invariants are specified in ticket 05; the tracker lives in `.scratch/`.
+ * Shape and invariants are specified in ticket 05 and the section model in ticket 26;
+ * the tracker lives in `.scratch/`.
  */
 
-export const DOCUMENT_VERSION = 1
+export const DOCUMENT_VERSION = 2
 
 export type PortKind = 'rj45' | 'sfp' | 'sfp+'
 
@@ -13,26 +14,19 @@ export type PortSpeed = '100M' | '1G' | '2.5G' | '5G' | '10G'
 
 export const PORT_SPEEDS: readonly PortSpeed[] = ['100M', '1G', '2.5G', '5G', '10G']
 
-/** The three conventions the builder can generate; `custom` means labels are user-owned. */
-export const GENERATED_NUMBERING_PRESETS = [
-  'odd-top-even-bottom',
+/** The conventions a Section generates labels under. */
+export const SECTION_NUMBERINGS = [
+  'alternating-top-first',
+  'alternating-bottom-first',
   'sequential',
-  'even-top-zero-based',
 ] as const
 
-export type GeneratedNumberingPreset = (typeof GENERATED_NUMBERING_PRESETS)[number]
+export type SectionNumbering = (typeof SECTION_NUMBERINGS)[number]
 
-export type NumberingPreset = GeneratedNumberingPreset | 'custom'
+/** Whether a Section counts on from the previous one, or pins its own start number. */
+export const SECTION_START_MODES = ['auto', 'custom'] as const
 
-export const NUMBERING_PRESETS: readonly NumberingPreset[] = [
-  ...GENERATED_NUMBERING_PRESETS,
-  'custom',
-]
-
-/** Rows after the first: keep counting, or restart at the preset's base number. */
-export type RowNumbering = 'continue' | 'start-over'
-
-export const ROW_NUMBERINGS: readonly RowNumbering[] = ['continue', 'start-over']
+export type SectionStartMode = (typeof SECTION_START_MODES)[number]
 
 export type Theme = 'light' | 'dark' | 'blueprint'
 
@@ -51,15 +45,26 @@ export interface Port {
   speed: PortSpeed
 }
 
+/** A horizontal group of ports on a faceplate. Derived from a Section's grid, never stored. */
 export interface Row {
-  /** Only meaningful on rows after the first; absent means `continue`. */
-  numbering?: RowNumbering
+  ports: Port[]
+}
+
+export interface Section {
+  kind: PortKind
+  speed: PortSpeed
+  rows: number
+  columns: number
+  numbering: SectionNumbering
+  startMode: SectionStartMode
+  /** `custom` sections pin this number; `auto` sections carry their resolved start. */
+  start: number
+  /** All rows × columns ports, materialised row by row. */
   ports: Port[]
 }
 
 export interface PortLayout {
-  numbering: NumberingPreset
-  rows: Row[]
+  sections: Section[]
 }
 
 export interface Switch {

@@ -29,7 +29,19 @@ function switchWith(rows: Row[], x = 0, y = 0): Switch {
     model: '',
     x,
     y,
-    layout: { numbering: 'odd-top-even-bottom', rows },
+    // One one-row Section per faceplate row keeps the flat row list identical.
+    layout: {
+      sections: rows.map((row) => ({
+        kind: row.ports[0]?.kind ?? 'rj45',
+        speed: row.ports[0]?.speed ?? '1G',
+        rows: 1,
+        columns: row.ports.length,
+        numbering: 'sequential' as const,
+        startMode: 'custom' as const,
+        start: 1,
+        ports: row.ports,
+      })),
+    },
   }
 }
 

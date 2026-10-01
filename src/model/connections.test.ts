@@ -18,9 +18,15 @@ function makeSwitch(id: string, portIds: string[]): Switch {
     x: 0,
     y: 0,
     layout: {
-      numbering: 'sequential',
-      rows: [
+      sections: [
         {
+          kind: 'rj45',
+          speed: '1G',
+          rows: 1,
+          columns: portIds.length,
+          numbering: 'sequential',
+          startMode: 'custom',
+          start: 1,
           ports: portIds.map((portId) => ({
             id: portId,
             label: portId.replace('p', ''),
@@ -190,7 +196,7 @@ describe('deleting switches and ports', () => {
     expect(updated.connections).toEqual([])
   })
 
-  it('deleting ports removes their connections and drops emptied rows', () => {
+  it('deleting ports removes their connections and drops emptied sections', () => {
     const result = connect(
       makeSetup(),
       { switch: 'sw1', port: 'p24' },
@@ -200,7 +206,10 @@ describe('deleting switches and ports', () => {
 
     const updated = removePorts(result.setup, 'sw1', ['p24'])
 
-    expect(updated.switches[0].layout.rows[0].ports.map((port) => port.id)).toEqual(['p1', 'p2'])
+    expect(updated.switches[0].layout.sections[0].ports.map((port) => port.id)).toEqual([
+      'p1',
+      'p2',
+    ])
     expect(updated.connections).toEqual([])
   })
 })

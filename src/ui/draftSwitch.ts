@@ -1,9 +1,6 @@
-import { materialiseRows } from '@/model/layout'
-import type { RowEdit } from '@/model/layoutEdit'
-import type { GeneratedNumberingPreset, Switch } from '@/model/types'
-
-/** The convention a hand-built switch starts with: the presets' most common one. */
-export const DEFAULT_DRAFT_NUMBERING: GeneratedNumberingPreset = 'odd-top-even-bottom'
+import { materialiseSections } from '@/model/layout'
+import type { SectionEdit } from '@/model/layoutEdit'
+import type { Switch } from '@/model/types'
 
 /**
  * A switch being built by hand. Ephemeral App-level UI state: the draft is
@@ -13,8 +10,7 @@ export const DEFAULT_DRAFT_NUMBERING: GeneratedNumberingPreset = 'odd-top-even-b
 export interface DraftSwitch {
   name: string
   model: string
-  numbering: GeneratedNumberingPreset
-  rows: RowEdit[]
+  sections: SectionEdit[]
   /** Top-left corner in canvas units, fixed where the committed switch will land. */
   x: number
   y: number
@@ -24,20 +20,14 @@ export function createDraftSwitch(position: { x: number; y: number }): DraftSwit
   return {
     name: '',
     model: '',
-    numbering: DEFAULT_DRAFT_NUMBERING,
-    rows: [],
+    sections: [],
     x: position.x,
     y: position.y,
   }
 }
 
-/** The rows that will materialise: zero-port rows are dropped, never previewed or committed. */
-export function draftRows(draft: DraftSwitch): RowEdit[] {
-  return draft.rows.filter((row) => row.spec.count > 0)
-}
-
 export function draftCanCommit(draft: DraftSwitch): boolean {
-  return draftRows(draft).length > 0
+  return draft.sections.length > 0
 }
 
 /** The switch the draft previews; `id` is the committed id, or empty for the ghost. */
@@ -48,22 +38,11 @@ export function draftToSwitch(draft: DraftSwitch, id = ''): Switch {
     model: draft.model,
     x: draft.x,
     y: draft.y,
-    layout: {
-      numbering: draft.numbering,
-      rows: materialiseRows(
-        draft.numbering,
-        draftRows(draft).map((row) => row.spec),
-      ),
-    },
+    layout: { sections: materialiseSections(draft.sections.map((section) => section.spec)) },
   }
 }
 
-/** A typed name/model, a row or a new convention is worth confirming before discard. */
+/** A typed name/model or a section is worth confirming before discard. */
 export function draftIsEdited(draft: DraftSwitch): boolean {
-  return (
-    draft.name.trim() !== '' ||
-    draft.model.trim() !== '' ||
-    draft.rows.length > 0 ||
-    draft.numbering !== DEFAULT_DRAFT_NUMBERING
-  )
+  return draft.name.trim() !== '' || draft.model.trim() !== '' || draft.sections.length > 0
 }

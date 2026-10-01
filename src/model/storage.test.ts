@@ -16,6 +16,36 @@ describe('storage', () => {
     expect(loadDocument(storage)).toEqual(document)
   })
 
+  it('migrates a version 1 autosave to version 2 on load', () => {
+    const v1 = {
+      version: 1,
+      setup: {
+        switches: [
+          {
+            id: 'sw1',
+            name: '',
+            model: '',
+            x: 0,
+            y: 0,
+            layout: {
+              numbering: 'sequential',
+              rows: [{ ports: [{ id: 'p1', label: '1', kind: 'rj45', speed: '1G' }] }],
+            },
+          },
+        ],
+        connections: [],
+      },
+      ui: { theme: 'light', cableLayer: 'behind', viewport: { x: 0, y: 0, zoom: 1 } },
+    }
+    const storage = fakeStorage({ [STORAGE_KEY]: JSON.stringify(v1) })
+
+    const restored = loadDocument(storage)
+
+    expect(restored?.version).toBe(2)
+    expect(restored?.setup.switches[0].layout.sections).toHaveLength(1)
+    expect(restored?.setup.switches[0].layout.sections[0].ports[0].id).toBe('p1')
+  })
+
   it('returns null when nothing has been saved', () => {
     expect(loadDocument(fakeStorage())).toBeNull()
   })
@@ -31,7 +61,7 @@ describe('storage', () => {
   it('returns null when the saved document fails validation', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const storage = fakeStorage({
-      [STORAGE_KEY]: serializeDocument(sampleDocument()).replace('"version": 1', '"version": 99'),
+      [STORAGE_KEY]: serializeDocument(sampleDocument()).replace('"version": 2', '"version": 99'),
     })
 
     expect(loadDocument(storage)).toBeNull()

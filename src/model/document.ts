@@ -37,7 +37,7 @@ export function findSwitch(setup: Setup, switchId: string): Switch | undefined {
 
 export function findPort(setup: Setup, ref: PortRef): Port | undefined {
   return findSwitch(setup, ref.switch)
-    ?.layout.rows.flatMap((row) => row.ports)
+    ?.layout.sections.flatMap((section) => section.ports)
     .find((port) => port.id === ref.port)
 }
 

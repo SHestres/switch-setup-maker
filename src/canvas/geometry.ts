@@ -1,4 +1,5 @@
 import { findSwitch } from '@/model/document'
+import { sectionRows } from '@/model/layout'
 import type { Connection, PortRef, Row, Setup, Switch } from '@/model/types'
 
 import {
@@ -94,7 +95,7 @@ function uplinkRowTop(index: number): number {
 
 /** The banks a faceplate renders, with their vertical/horizontal placement. */
 function placedBanks(switch_: Switch): FaceplateBank[] {
-  const { main, left, right } = splitBanks(switch_.layout.rows)
+  const { main, left, right } = splitBanks(switch_.layout.sections.flatMap(sectionRows))
   const portfieldLeft = FACE_BORDER + FACE_PADDING_X + CHROME_LEFT_WIDTH
   const portfieldWidth =
     RACK_WIDTH - 2 * FACE_BORDER - 2 * FACE_PADDING_X - CHROME_LEFT_WIDTH - CHROME_RIGHT_WIDTH
@@ -172,7 +173,7 @@ function round2(value: number): number {
 
 /** The rendered faceplate height, mirroring the CSS box (border-box, 89px minimum). */
 function faceHeight(switch_: Switch): number {
-  const { main, left, right } = splitBanks(switch_.layout.rows)
+  const { main, left, right } = splitBanks(switch_.layout.sections.flatMap(sectionRows))
   const contentHeight = Math.max(
     FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y,
     mainBankHeight(main),
