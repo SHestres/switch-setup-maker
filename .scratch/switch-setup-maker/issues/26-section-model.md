@@ -1,7 +1,7 @@
 # 26: Section model, per-section numbering & migration
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None (can start immediately)
 
 ## What to build
@@ -22,3 +22,18 @@ Presets are re-expressed as Section recipes (see `spec.md`'s layout-preset table
 - [ ] Presets are re-expressed as Section recipes with their existing port counts.
 - [ ] The document schema version is bumped and the v1 migration policy is decided and documented in this ticket; import/export, autosave/restore and validation match it.
 - [ ] Unit tests cover the numbering chain (Auto/Custom, all three conventions, multi-pair Sections), materialise/relabel and connection purge; `npm test` is green.
+
+## Answer
+
+Implemented (work commit `182e941`, merged `9263f92`). `layout.sections[]` replaces `layout.rows[]`; a Section is `{kind, speed, rows, columns, numbering, startMode, start, ports[]}` with Ports materialized row-major and stable `p<n>` ids. Numbering is per Section (`alternating-top-first`, `alternating-bottom-first`, `sequential`): within each row pair the chosen row takes the start number and both rows step by 2, and each later pair continues after the span. Start mode: `auto` (first Section 1, each next = previous highest + 1) or `custom` (pinned; resizing renumbers the following Auto Sections). Helpers: `generateSectionLabels`, `resolveSectionStarts`, `materializeSections`, `relabelSections`, `sectionRows`; edits go through `planLayoutEdit`/`applyLayoutEdit`, preserving surviving Port ids and purging removed Ports' Connections through `removePorts`. Presets are Section recipes exactly matching the spec table (24×1G+2×SFP 26 ports; Unifi 48 Port 52; 24×1G+4×SFP+ 28; 12×1G+2×SFP 14, zero-based).
+
+**Schema v2 and the v1 migration policy (automatic conversion; one rejection).** v1 `layout.numbering: "custom"` is rejected (`choose a generated numbering`) because v2 has no user-owned labels; everything else converts:
+
+1. `odd-top-even-bottom` → alternating top-first base 1; `even-top-zero-based` → alternating top-first base 0; `sequential` → sequential base 1.
+2. v1 Rows group while kind/speed match and no `start-over`; a `start-over`, kind change or speed change opens a group.
+3. A group becomes one Section per pair of Rows (or one sequential Section under the sequential convention); a trailing unpaired Row becomes its own 1-row sequential Section, preserving v1's `…, 5, 6` counting.
+4. The first group — and any group opened by `start-over` — is `custom` at the base (1 or 0); all others are `auto`, reproducing `continue`.
+5. Port ids are preserved (Connections ride unchanged); ragged Rows pad to the widest with fresh ids; labels regenerate under v2 rules, identical for preset-shaped layouts.
+6. Mixed kind/speed v1 Rows are rejected; `ui` is preserved and `version` becomes 2.
+
+Verification: unit tests cover all three conventions, multi-pair Sections, the Auto/Custom chain, materialize/relabel, v1 conversion (9 migration tests plus storage restore) and connection purge; `npm test` green (250 at the integration tip).

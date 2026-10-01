@@ -1,7 +1,7 @@
 # 28: MVP pre-merge edits
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None (can start immediately)
 
 ## What to build
@@ -46,3 +46,9 @@ The agreed edit batch on `integration/mvp` before the branch merges to `main`. T
 - [ ] The ThemeControl/CableLayerControl, `ui` setter, content-height and `PendingWire` naming duplications are removed.
 - [ ] Docker `build`/`run` verification remains outstanding and is called out as such (not silently skipped).
 - [ ] `npm test`, `npm run build` and `npm run lint` are green.
+
+## Answer
+
+Implemented (work commit `882073a`, merged `0f99306`). Placement: `placeNewSwitch(viewport, container, occupied)` scans mirrored cascade candidates and never reuses an occupied top-left, so a deletion cannot hand a later switch an occupied slot. Live tracking: geometry takes the in-flight drag position (`MovedSwitch`) and `WireLayer` and the selected-cable affordance redraw every frame, while the document is written only on gesture end. Tests were trimmed to behavior level (persistence/drag outcomes) with the pure geometry/placement unit tests kept, and `scripts/serve.test.mjs` counts as the third seam. Dedupes: shared `SegmentedControl`, generic `setUi`, `faceContentHeight`, `PendingWireState`. Kept: `docker-compose.yml` + its README section, Delete/Backspace cable deletion, `scripts/serve.test.mjs`.
+
+**Docker verification (previously owed) is complete**, on rootless Docker: the multi-stage image builds; `docker run` with no configuration serves 200 (HTML and hashed JS asset) with correct 404s; `-e PORT=3000 -p 3000:3000` serves 200; `docker compose up` with `PORT=8081` serves 200 and `down` cleans up; the same `dist/` served from a sub-path (`/app/`) gives zero 404s. Full acceptance: story 134/134, visual 27/27, zero console/page errors; evidence in `/tmp/opencode/ssm-accept2/evidence.md`.

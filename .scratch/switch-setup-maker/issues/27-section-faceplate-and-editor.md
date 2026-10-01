@@ -1,7 +1,7 @@
 # 27: Section faceplate rendering & bottom-panel editor
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 26
 
 ## What to build
@@ -19,3 +19,9 @@ Prototype reference: [prototype/26-sections-editor.html](../prototype/26-section
 - [ ] Section cards carry move-left/move-right controls; reordering re-renders the faceplate in the new section order.
 - [ ] App-level tests cover Section editing and start-mode chaining (Auto follows the previous Section; Custom pins).
 - [ ] Visual acceptance against the prototype's variant D on a production build.
+
+## Answer
+
+Implemented (work commit `a08612c`, merged `a737e58`). The Faceplate renders `layout.sections` left → right, each vertically centered on the chassis: 6px gaps between same-kind neighbors, 16px otherwise; labels sit above the top row and below the bottom row of each row-pair. `geometry.ts` mirrors the placement exactly (no DOM measurement) and its pure tests use hand-computed worked examples across densities. The Inspector became a full-width bottom panel (never modal) with one card per Section exposing rows, columns, kind, speed, numbering and start mode/start, plus move-left/right; the panel height is draggable (170px min, 70% viewport max) and auto-fits on open and after content changes until the user truly drags. Reordering re-renders and re-chains labels. The draft flow is unchanged: ghost preview, commit via `Add switch`, silent discard when untouched, confirm when edited. The disabled "Custom (not editable in v1)" numbering option is gone.
+
+Verification: app-level tests cover Section editing, Auto chaining (resizing renumbers the following Auto Sections), Custom pinning, reorder, and the auto-fit/drag behavior. Production-build acceptance: story 134/134 and visual 27/27, including measured 6/6/16px gaps, 0.000px vertical-centering deviation and a variant-D comparison; evidence in `/tmp/opencode/ssm-accept2/evidence.md`. Review fixes (`64c67ae`) fixed auto-fit freezing on a click and the bottom-first range chip; acceptance fix `c1dbbd7` raised dialogs above the panel.
