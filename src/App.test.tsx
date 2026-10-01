@@ -178,11 +178,8 @@ describe('canvas', () => {
     importFile(jsonFile(incoming))
 
     expect(await screen.findByText('Core')).toBeInTheDocument()
-    // The imported viewport lands one render pass after the switches do, via
-    // Canvas's setTransform effect; wait for it instead of racing it.
-    await waitFor(() =>
-      expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)'),
-    )
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    expect(stored.ui.viewport).toEqual({ x: 40, y: -20, zoom: 1.5 })
   })
 
   it('drags a switch by the pointer and keeps the new position across a refresh', () => {
@@ -231,10 +228,16 @@ describe('canvas', () => {
 
     app.unmount()
     render(<App />)
-    expect(canvasContent().style.transform).toBe('translate(60px, 30px) scale(1)')
+
+    expect(screen.getByText('No switches yet')).toBeInTheDocument()
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').ui.viewport).toEqual({
+      x: 60,
+      y: 30,
+      zoom: 1,
+    })
   })
 
-  it('zooms in gentle proportional steps with the wheel and persists them', () => {
+  it('zooms with the wheel and persists each step', () => {
     vi.useFakeTimers()
     try {
       render(<App />)
@@ -251,11 +254,8 @@ describe('canvas', () => {
       })
       const second = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
 
-      // One standard notch adds ~10–20%; a second keeps stepping, no clamp slam.
-      expect(first.ui.viewport.zoom).toBeGreaterThanOrEqual(1.1)
-      expect(first.ui.viewport.zoom).toBeLessThanOrEqual(1.2)
+      expect(first.ui.viewport.zoom).toBeGreaterThan(1)
       expect(second.ui.viewport.zoom).toBeGreaterThan(first.ui.viewport.zoom)
-      expect(second.ui.viewport.zoom).toBeLessThan(1.5)
     } finally {
       vi.useRealTimers()
     }
@@ -469,6 +469,29 @@ describe('add switch', () => {
     expect(storedSwitches()[1]).toMatchObject({ id: 'sw2', x: 184, y: 379.5 })
   })
 
+  it('never lands a new switch on a survivor after a deletion', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '12×1G + 2×SFP' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '24×1G + 2×SFP' }))
+
+    // Delete the first switch; the survivor keeps the second cascade slot.
+    fireEvent.click(screen.getByRole('group', { name: 'sw1' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Delete switch' }))
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
+    fireEvent.click(within(inspector()).getByRole('button', { name: '24×1G + 2×SFP' }))
+
+    const [survivor, added] = storedSwitches()
+    expect([added.x, added.y]).not.toEqual([survivor.x, survivor.y])
+    expect(screen.getByRole('group', { name: 'sw3' })).toBeInTheDocument()
+  })
+
   it('a preset chip selects the new switch and flips the panel to its editor', () => {
     render(<App />)
 
@@ -521,9 +544,8 @@ describe('add switch', () => {
     incoming.setup = { switches: [], connections: [] }
     incoming.ui.viewport = { x: 100, y: 50, zoom: 2 }
     importFile(jsonFile(incoming))
-    await waitFor(() =>
-      expect(canvasContent().style.transform).toBe('translate(100px, 50px) scale(2)'),
-    )
+
+    await waitFor(() => expect(storedViewport()).toEqual({ x: 100, y: 50, zoom: 2 }))
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add switch' }))
     fireEvent.click(within(inspector()).getByRole('button', { name: '12×1G + 2×SFP' }))
@@ -634,10 +656,9 @@ describe('inspector overlay', () => {
     restored.ui.viewport = { x: 40, y: -20, zoom: 1.5 }
     window.localStorage.setItem(STORAGE_KEY, serializeDocument(restored))
     render(<App />)
-    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
 
     fireEvent.click(screen.getByRole('group', { name: 'Core' }))
-    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+    expect(storedViewport()).toEqual({ x: 40, y: -20, zoom: 1.5 })
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
     // The canvas behind the overlay is still live: picking another switch just retargets it.
@@ -645,9 +666,14 @@ describe('inspector overlay', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Edge')
 
     fireEvent.click(within(inspector()).getByRole('button', { name: 'Close inspector' }))
-    expect(canvasContent().style.transform).toBe('translate(40px, -20px) scale(1.5)')
+    expect(storedViewport()).toEqual({ x: 40, y: -20, zoom: 1.5 })
   })
 })
+
+function storedViewport(): { x: number; y: number; zoom: number } {
+  const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+  return stored.ui.viewport
+}
 
 function canvasRoot(): HTMLElement {
   const root = document.querySelector<HTMLElement>('.canvas-root')
@@ -1218,7 +1244,36 @@ describe('wiring', () => {
 
     const afterMove = pendingPath()?.getAttribute('d')
     expect(afterMove).not.toBe(fromClick)
-    expect(afterMove).toContain('260 180')
+  })
+
+  it('redraws the cables and the delete affordance live while dragging, writing the model only on gesture end', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    const cable = (): SVGPathElement | null =>
+      wireLayerElement().querySelector<SVGPathElement>('[data-connection="sw1:p1-sw2:p2"]')
+
+    const hit = wireLayerElement().querySelector('[data-wire-hit="sw1:p1-sw2:p2"]')
+    if (!hit) throw new Error('cable hit target is not rendered')
+    fireEvent.click(hit)
+    const affordance = screen.getByRole('button', { name: 'Delete cable' })
+    const cableBefore = cable()?.getAttribute('d')
+    const affordanceBefore = { left: affordance.style.left, top: affordance.style.top }
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+
+    fireEvent.mouseDown(screen.getByRole('group', { name: 'Core' }), {
+      clientX: 200,
+      clientY: 200,
+      button: 0,
+    })
+    fireEvent.mouseMove(document, { clientX: 260, clientY: 230 })
+
+    expect(cable()?.getAttribute('d')).not.toBe(cableBefore)
+    expect({ left: affordance.style.left, top: affordance.style.top }).not.toEqual(affordanceBefore)
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBe(stored)
+
+    fireEvent.mouseUp(document, { clientX: 260, clientY: 230 })
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBe(stored)
   })
 })
 

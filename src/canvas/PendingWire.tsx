@@ -2,7 +2,7 @@ import type { Setup } from '@/model/types'
 
 import { pointForPort, wireCurve } from './geometry'
 import { portKey } from './portRef'
-import type { PendingWire as PendingWireState } from './wiring'
+import type { PendingWireState } from './wiring'
 
 export interface PendingWireProps {
   setup: Setup
