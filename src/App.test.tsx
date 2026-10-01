@@ -884,79 +884,49 @@ describe('switch layout editor', () => {
     expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p50'])
   })
 
-  it('restarts the typing pause on each keystroke, so only the settled value commits', () => {
-    vi.useFakeTimers()
-    try {
-      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
-      render(<App />)
-      openCoreEditor()
-      const columns = within(inspector()).getByLabelText('Section 1 columns')
-
-      fireEvent.change(columns, { target: { value: '1' } })
-      act(() => {
-        vi.advanceTimersByTime(300)
-      })
-      // Still inside the pause: the intermediate one-column layout has not landed.
-      expect(storedLayout().sections[0].ports).toHaveLength(2)
-
-      fireEvent.change(columns, { target: { value: '12' } })
-      act(() => {
-        vi.advanceTimersByTime(400)
-      })
-
-      expect(storedLayout().sections[0].columns).toBe(12)
-      expect(storedLayout().sections[0].ports).toHaveLength(12)
-      expect(screen.getByRole('button', { name: 'RJ45 port 23 (1G) on Core' })).toBeInTheDocument()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('applies a safe shrink live and keeps the connections on surviving ports', () => {
-    vi.useFakeTimers()
-    try {
-      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
-      render(<App />)
-      openCoreEditor()
-      const columns = within(inspector()).getByLabelText('Section 1 columns')
-
-      fireEvent.change(columns, { target: { value: '1' } })
-      act(() => {
-        vi.advanceTimersByTime(400)
-      })
-
-      // Dropping the unconnected p2 is safe: no confirm, and p1's connection survives.
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1'])
-      expect(storedConnections()).toEqual([
-        { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p2' } },
-      ])
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it('never confirms a severing shrink while typing; blur still asks', async () => {
-    vi.useFakeTimers()
-    try {
-      window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
-      render(<App />)
-      openCoreEditor()
-      const columns = within(inspector()).getByLabelText('Section 1 columns')
-
-      fireEvent.change(columns, { target: { value: '1' } })
-      act(() => {
-        vi.advanceTimersByTime(1000)
-      })
-
-      // The live commit is skipped: the confirm cannot interrupt typing, and nothing landed.
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(storedLayout().sections[0].ports).toHaveLength(2)
-    } finally {
-      vi.useRealTimers()
-    }
-
+  it('commits a typed value immediately, with no pause or blur', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
     const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+
+    expect(storedLayout().sections[0].columns).toBe(3)
+    expect(storedLayout().sections[0].ports.map((port) => port.label)).toEqual(['1', '3', '5'])
+    expect(screen.getByRole('button', { name: 'RJ45 port 5 (1G) on Core' })).toBeInTheDocument()
+  })
+
+  it('applies a safe shrink immediately and keeps the connections on surviving ports', () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleDocument()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    // Dropping the unconnected p2 is safe: no confirm, and p1's connection survives.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().sections[0].ports.map((port) => port.id)).toEqual(['p1'])
+    expect(storedConnections()).toEqual([
+      { a: { switch: 'sw1', port: 'p1' }, b: { switch: 'sw2', port: 'p2' } },
+    ])
+  })
+
+  it('defers a typed severing shrink until blur, then confirms', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '1' })
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    // Nothing landed: the typed change waits so a confirm cannot interrupt a longer number.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(storedLayout().sections[0].ports).toHaveLength(2)
+
     fireEvent.blur(columns)
 
     const dialog = await screen.findByRole('alertdialog')
@@ -965,6 +935,50 @@ describe('switch layout editor', () => {
 
     expect(columns).toHaveValue(2)
     expect(storedLayout().sections[0].ports).toHaveLength(2)
+    expect(storedConnections()).toHaveLength(2)
+  })
+
+  it('confirms a stepper change that severs immediately, without waiting for blur', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    // Type first: the marker is set to typing and must reset after that change.
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+    expect(storedLayout().sections[0].columns).toBe(3)
+
+    // A spinner click arrives without a keydown: a discrete step, so it confirms at once.
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(storedLayout().sections[0].columns).toBe(3)
+    expect(storedConnections()).toHaveLength(2)
+  })
+
+  it('treats an arrow key after typing as a discrete step that confirms at once', async () => {
+    window.localStorage.setItem(STORAGE_KEY, serializeDocument(sampleWithTwoLinks()))
+    render(<App />)
+    openCoreEditor()
+    const columns = within(inspector()).getByLabelText('Section 1 columns')
+
+    fireEvent.keyDown(columns, { key: '3' })
+    fireEvent.change(columns, { target: { value: '3' } })
+    expect(storedLayout().sections[0].columns).toBe(3)
+
+    // Arrow down from 3 to 1 would sever p2; the arrow resets the typing classification.
+    fireEvent.keyDown(columns, { key: 'ArrowDown' })
+    fireEvent.change(columns, { target: { value: '1' } })
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('Applying this change to Core severs 1 connection.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(storedLayout().sections[0].columns).toBe(3)
     expect(storedConnections()).toHaveLength(2)
   })
 
@@ -1666,16 +1680,8 @@ describe('draft switch', () => {
     expect(storedSwitches()).toHaveLength(0)
 
     const columns = within(inspector()).getByLabelText('Section 1 columns')
-    // The number commits itself after the typing pause; no blur.
-    vi.useFakeTimers()
-    try {
-      fireEvent.change(columns, { target: { value: '4' } })
-      act(() => {
-        vi.advanceTimersByTime(400)
-      })
-    } finally {
-      vi.useRealTimers()
-    }
+    // The number commits immediately; no blur needed.
+    fireEvent.change(columns, { target: { value: '4' } })
 
     expect(within(preview).getByText('7')).toBeInTheDocument()
     expect(within(preview).queryByText('9')).not.toBeInTheDocument()

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { resolveSectionStarts, sectionLabelRange } from '@/model/layout'
@@ -19,9 +19,6 @@ const DIMENSION_MIN = 1
 const DIMENSION_MAX = 48
 const START_MIN = 0
 const START_MAX = 100000
-
-/** How long a valid number waits for the next keystroke before it commits itself. */
-const LIVE_COMMIT_MS = 400
 
 /** What a hand-added section starts as: the presets' most common bank. */
 const NEW_SECTION: SectionSpec = {
@@ -47,9 +44,9 @@ const START_MODE_LABELS: Record<SectionStartMode, string> = {
 const KIND_LABELS: Record<PortKind, string> = { rj45: 'RJ45', sfp: 'SFP' }
 
 /**
- * How a section edit should be applied. `live` marks a debounced commit made while a
- * number field still holds focus: the app applies it only when it severs nothing, so no
- * confirm dialog can interrupt typing. Blur and Enter commit without `live`.
+ * How a section edit should be applied. `live` marks a change made while typing in a
+ * number field: the app applies it only when it severs nothing, so a confirm can never
+ * interrupt a longer number. Stepper/arrow changes and blur/Enter commit without `live`.
  */
 export interface SectionEditOptions {
   live?: boolean
@@ -361,16 +358,16 @@ interface NumberFieldProps {
   min: number
   max: number
   disabled?: boolean
-  /** `live` marks the debounced commit; blur and Enter commit without it. */
+  /** `live` marks a change typed in the field; blur, Enter and stepper changes commit without it. */
   onCommit: (value: number, live: boolean) => void
 }
 
 /**
- * A number commits itself once typing pauses, and immediately on blur or Enter. The
- * pause keeps a valid "2" on the way to "24" from reaching the document; invalid or
- * intermediate values never commit. A live commit carries `live` so the app can skip
- * it when it would sever connections — that edit waits for blur/Enter, where the
- * confirm belongs.
+ * A valid number reaches the document immediately — no pause, no blur needed. A typed
+ * value that would sever connections carries `live` instead, so the app can skip it and
+ * wait for blur or Enter, where the confirm belongs; a dialog can then never interrupt a
+ * longer number. Stepper clicks and arrow keys are discrete, so their destructive change
+ * commits without `live` and confirms at once. Invalid values never commit.
  */
 function NumberField({
   label,
@@ -388,24 +385,26 @@ function NumberField({
   const parsed = /^\d+$/.test(shown.trim()) ? Number(shown) : null
   const invalid = parsed === null || parsed < min || parsed > max
 
-  // The debounce effect reads the callback through a ref so parent re-renders refresh it
-  // without restarting the timer.
-  const commitRef = useRef(onCommit)
-  useEffect(() => {
-    commitRef.current = onCommit
-  })
+  // A keydown for an editing key marks the change that follows as typing; anything else
+  // (a stepper click, an arrow key) is a discrete step. Reset after every change so a
+  // stepper click right after typing is never mistaken for more typing.
+  const typingRef = useRef(false)
 
-  useEffect(() => {
-    if (draft === null || parsed === null || parsed < min || parsed > max || parsed === value) {
-      return
-    }
-    const timer = setTimeout(() => commitRef.current(parsed, true), LIVE_COMMIT_MS)
-    return () => clearTimeout(timer)
-  }, [draft, parsed, min, max, value])
+  const tryCommit = (next: number, live: boolean) => {
+    if (next !== value) onCommit(next, live)
+  }
+
+  const handleChange = (raw: string) => {
+    setDraft(raw)
+    const next = /^\d+$/.test(raw.trim()) ? Number(raw) : null
+    if (next !== null && next >= min && next <= max) tryCommit(next, typingRef.current)
+    typingRef.current = false
+  }
 
   const commit = () => {
-    if (!invalid && parsed !== null && parsed !== value) onCommit(parsed, false)
+    if (!invalid && parsed !== null) tryCommit(parsed, false)
     setDraft(null)
+    typingRef.current = false
   }
 
   return (
@@ -422,10 +421,20 @@ function NumberField({
         aria-describedby={invalid ? errorId : undefined}
         disabled={disabled}
         value={shown}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => handleChange(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') commit()
+          if (event.key === 'Enter') {
+            commit()
+            return
+          }
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            typingRef.current = false
+            return
+          }
+          if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+            typingRef.current = true
+          }
         }}
       />
       {invalid && (

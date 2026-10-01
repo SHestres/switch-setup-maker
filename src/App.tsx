@@ -235,8 +235,8 @@ export default function App() {
 
   /**
    * A layout edit from the selected switch. Destructive edits confirm first, except a
-   * `live` debounced commit: that one is skipped, leaving the field to ask again on
-   * blur/Enter so no dialog can interrupt typing.
+   * `live` typed change: that one is skipped, leaving the field to ask again on blur/Enter
+   * so no dialog can interrupt a longer number.
    */
   const requestLayoutEdit = (edit: LayoutEdit, options?: SectionEditOptions) => {
     const switch_ = selectedSwitch

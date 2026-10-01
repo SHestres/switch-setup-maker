@@ -9,7 +9,7 @@ export interface SwitchEditorProps {
   onChange: (changes: { name?: string; model?: string }) => void
   /**
    * A valid layout edit; the app decides whether it needs confirming first. `live` marks a
-   * debounced commit: the app applies it only when it severs nothing.
+   * change typed in a number field: the app applies it only when it severs nothing.
    */
   onLayoutEdit: (edit: LayoutEdit, options?: SectionEditOptions) => void
   onDelete: () => void

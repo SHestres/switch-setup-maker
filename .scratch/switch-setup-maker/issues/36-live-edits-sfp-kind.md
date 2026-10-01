@@ -13,8 +13,8 @@ Two small post-MVP changes.
 
 ## Acceptance criteria
 
-- [x] A valid rows/columns/start-number change updates the faceplate after the typing pause, without blur.
-- [x] A shrink that would sever connections does not auto-commit; blur/Enter opens the existing confirm, and Cancel restores the last committed layout.
+- [x] A valid rows/columns/start-number change updates the faceplate immediately, without blur.
+- [x] A stepper click or arrow-key change that would sever connections confirms immediately; a typed one waits for blur/Enter, and Cancel restores the last committed layout.
 - [x] Invalid input never commits, with the inline error unchanged.
 - [x] Both the editor and the draft builder get the live behavior.
 - [x] SFP+ is gone from the model, kind select, rendering, presets, fixtures and tests; accessible names read `SFP port n (10G)`.
@@ -27,8 +27,9 @@ Implemented on `ticket/36-live-edits-sfp-kind`.
 
 **Live number commits.**
 
-- `NumberField` debounces valid values by 400 ms (`LIVE_COMMIT_MS`) and commits them with `live: true`; blur/Enter commit immediately without it. Invalid values still never commit and keep the inline error; the callback is read through a ref so parent re-renders refresh it without restarting the timer.
-- `SectionEditOptions { live }` threads the intent through `SwitchFields` → `SwitchEditor` → `App`. `requestLayoutEdit` skips a `live` edit when `countSeveredConnections` is positive, so the "Change layout?" confirm can never interrupt typing; blur/Enter raises it as before, and Cancel restores the last committed layout.
+- `NumberField` commits every valid change immediately — no debounce. Typing, stepper clicks and arrow keys all reach the document at once; invalid values still never commit and keep the inline error.
+- Typing is told apart from stepping by the keydown that precedes a change: an editing key (a character, Backspace, Delete) marks it as `live`, an arrow key clears it, and the marker resets after every change so a spinner click straight after typing is not mistaken for more typing. `SectionEditOptions { live }` threads that intent through `SwitchFields` → `SwitchEditor` → `App`.
+- `requestLayoutEdit` skips a `live` edit when `countSeveredConnections` is positive, so a typed shrink that would sever connections waits for blur/Enter where the confirm belongs; a stepper click or arrow key commits without `live` and confirms at once — a spinner click that never focuses the field can no longer strand the edit. Cancel restores the last committed layout.
 - Both surfaces share the behavior: the editor, and the draft builder (whose drafts have no connections, so its `live` flag is ignored).
 
 **One SFP kind.**
@@ -38,7 +39,11 @@ Implemented on `ticket/36-live-edits-sfp-kind`.
 
 **Tests / checks.**
 
-- `npm test`: 255 tests / 17 files green (was 250 / 17). New: three App-level live-commit tests (typing-pause restart, safe shrink keeping connections, severing shrink never confirming mid-typing), two legacy-kind serialize tests, and the draft preview test now advances the debounce instead of blurring.
-- Mutation check: stubbing out the `options?.live` skip makes the mid-typing confirm test fail.
+- `npm test`: 257 tests / 17 files green (was 250 / 17). New: five App-level number-field tests (immediate typed commit, safe shrink keeping connections, typed severing shrink deferring to blur, stepper severing shrink confirming at once, arrow key after typing confirming at once), two legacy-kind serialize tests, and the draft preview test now asserting the immediate update.
+- Mutation check: stubbing out the `options?.live` skip makes the typed-deferral test fail.
 - `npm run format:check`, `npm run lint` and `npm run build` green.
 - Living docs updated: GLOSSARY Port kind, spec preset table/builder/schema paragraph, ADR 0002.
+
+## Comments
+
+- 2026-10-01 — Follow-up from the user after trying it: dropped the 400 ms pause (invalid values still hold back) and split destructive confirmation by input source. A spinner-click shrink that would sever connections previously relied on blur, but a spinner click need not focus the field, so the edit could strand forever; stepper/arrow changes now confirm immediately, typed ones still wait for blur. The keydown-based typing/stepping classification replaced the debounce timer; tests and the spec sentence were updated.
