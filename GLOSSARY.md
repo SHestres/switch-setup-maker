@@ -49,7 +49,7 @@ A named, pre-built port layout offered as a starting point when adding a Switch 
 _Avoid_: Template, model preset, switch type
 
 **Connection**:
-An undirected logical link between two Ports, or between a Port and a Device; carries the cable's attributes (colour, and later length and type).
+An undirected logical link between two Ports, or between a Port and a Device; carries the cable's attributes, color and length.
 _Avoid_: Link, wire, edge
 
 **Device**:
@@ -57,8 +57,12 @@ The far end of a Connection that is not a Port: something plugged into a Port th
 _Avoid_: Port device, endpoint, peripheral
 
 **Cable**:
-The physical medium realising a connection; its attributes are stored on the Connection, not as a separate thing.
+The physical medium realising a connection; its color and length are stored on the Connection, not as a separate thing. Type is inferred from the ports a Connection joins, never stored.
 _Avoid_: Wire, lead
+
+**Cable color**:
+One of nine named palette tokens — red, orange, yellow, green, teal, blue, purple, pink, brown — or unset for the theme's default wire. Meaning is the user's; computed state cues layer over it rather than replace it.
+_Avoid_: Colour code, stroke color
 
 **Canvas**:
 The pannable, zoomable workspace holding switches and their connections.
