@@ -1,7 +1,7 @@
 # 27: Section faceplate rendering & bottom-panel editor
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 26
 
 ## What to build
