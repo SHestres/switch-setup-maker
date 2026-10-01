@@ -1,7 +1,7 @@
 # 29: Port devices — model & editing (generic + named)
 
 Type: grilling
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (decision ticket; implementation composes with 26–27)
 
 ## Question

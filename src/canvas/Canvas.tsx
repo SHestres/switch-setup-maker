@@ -94,15 +94,6 @@ export function Canvas({
   // The blueprint theme always draws cables above; the stored preference is
   // left untouched for the other themes.
   const cablesAbove = document.ui.theme === 'blueprint' || document.ui.cableLayer === 'above'
-  const cablesLayer = (
-    <WireLayer
-      setup={document.setup}
-      selected={selectedConnection}
-      onSelectConnection={onSelectConnection}
-      onDeleteConnection={onDeleteConnection}
-    />
-  )
-
   const rootRef = useRef<HTMLDivElement | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef | null>(null)
   const scaleRef = useRef(viewport.zoom)
@@ -111,6 +102,15 @@ export function Canvas({
   const movedRef = useRef(false)
   const suppressClickRef = useRef(false)
   const [drag, setDrag] = useState<DragPosition | null>(null)
+  const cablesLayer = (
+    <WireLayer
+      setup={document.setup}
+      moved={drag}
+      selected={selectedConnection}
+      onSelectConnection={onSelectConnection}
+      onDeleteConnection={onDeleteConnection}
+    />
+  )
   // The pointer in canvas units, tagged with the Port it belongs to, so a stale
   // position from a previous wire is never reused.
   const [pointer, setPointer] = useState<{ ref: PortRef; point: Point } | null>(null)

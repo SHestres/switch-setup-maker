@@ -14,6 +14,13 @@ export const DEFAULT_CANVAS_SIZE: Size = { width: 1200, height: 800 }
 /** Diagonal step between cascaded placements, in canvas units. */
 export const CASCADE_STEP = 24
 
+/**
+ * The mirrored cascade visits finitely many slots; once this many candidates
+ * are occupied the fallback keeps stepping diagonally (past the viewport) so a
+ * placement can still never coincide with a switch already on the canvas.
+ */
+const MAX_CASCADE_SLOTS = 128
+
 /** The canvas point at the centre of the visible viewport, in canvas units. */
 export function visibleCentre(viewport: Viewport, container: Size): Point {
   const size = usableSize(container)
@@ -24,12 +31,28 @@ export function visibleCentre(viewport: Viewport, container: Size): Point {
 }
 
 /**
- * Top-left corner for a new switch: centred on the visible canvas, nudged down
- * and right once per earlier placement. The nudge reflects at the visible
- * viewport's edge instead of wrapping, so placements never leave the viewport
- * and never land exactly on an earlier one.
+ * Top-left corner for a new switch: the first cascade candidate — centred on
+ * the visible canvas, then nudged down and right — that does not coincide with
+ * any `occupied` switch. Callers pass the switches currently on the canvas,
+ * not their count, so deleting one never hands a later switch an occupied
+ * slot. The nudge reflects at the visible viewport's edge instead of wrapping,
+ * so placements stay on screen until every slot is taken.
  */
-export function placeNewSwitch(viewport: Viewport, container: Size, cascadeIndex = 0): Point {
+export function placeNewSwitch(
+  viewport: Viewport,
+  container: Size,
+  occupied: readonly Point[] = [],
+): Point {
+  const taken = new Set(occupied.map(({ x, y }) => `${x},${y}`))
+  for (let index = 0; index < MAX_CASCADE_SLOTS; index++) {
+    const candidate = cascadeCandidate(viewport, container, index)
+    if (!taken.has(`${candidate.x},${candidate.y}`)) return candidate
+  }
+  return overflowCandidate(viewport, container, taken)
+}
+
+/** One mirrored cascade candidate, `cascadeIndex` diagonal steps from centre. */
+function cascadeCandidate(viewport: Viewport, container: Size, cascadeIndex: number): Point {
   const size = usableSize(container)
   const centre = visibleCentre(viewport, size)
   const roomX = Math.max(0, (size.width / viewport.zoom - RACK_WIDTH) / 2)
@@ -46,6 +69,21 @@ function cascadeOffset(index: number, room: number): number {
   const cycle = 2 * room
   const offset = (index * CASCADE_STEP) % cycle
   return offset > room ? cycle - offset : offset
+}
+
+/**
+ * Every mirrored slot is taken: continue the same diagonal without reflecting,
+ * one distinct position per step, so two switches still never share a corner.
+ */
+function overflowCandidate(viewport: Viewport, container: Size, taken: ReadonlySet<string>): Point {
+  const centre = visibleCentre(viewport, usableSize(container))
+  for (let index = MAX_CASCADE_SLOTS; ; index++) {
+    const candidate = {
+      x: centre.x - RACK_WIDTH / 2 + index * CASCADE_STEP,
+      y: centre.y - FACE_HEIGHT / 2 + index * CASCADE_STEP,
+    }
+    if (!taken.has(`${candidate.x},${candidate.y}`)) return candidate
+  }
 }
 
 function usableSize(container: Size): Size {

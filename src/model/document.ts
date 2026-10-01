@@ -82,17 +82,26 @@ export function moveSwitch(
   }
 }
 
+/** Replace one persisted `ui` preference without touching the rest of the ui state. */
+function setUi<Key extends keyof UiState>(
+  document: SetupDocument,
+  key: Key,
+  value: UiState[Key],
+): SetupDocument {
+  return { ...document, ui: { ...document.ui, [key]: value } }
+}
+
 /** Replace the persisted viewport without touching the rest of the ui state. */
 export function setViewport(document: SetupDocument, viewport: Viewport): SetupDocument {
-  return { ...document, ui: { ...document.ui, viewport } }
+  return setUi(document, 'viewport', viewport)
 }
 
 /** Switch the persisted theme without touching the rest of the ui state. */
 export function setTheme(document: SetupDocument, theme: Theme): SetupDocument {
-  return { ...document, ui: { ...document.ui, theme } }
+  return setUi(document, 'theme', theme)
 }
 
 /** Switch the persisted cable layer without touching the rest of the ui state. */
 export function setCableLayer(document: SetupDocument, cableLayer: CableLayer): SetupDocument {
-  return { ...document, ui: { ...document.ui, cableLayer } }
+  return setUi(document, 'cableLayer', cableLayer)
 }
