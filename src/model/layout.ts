@@ -66,6 +66,14 @@ export function generateSectionLabels(grid: SectionGrid, start: number): string[
   return labels
 }
 
+/** The span a Section's printed labels cover at a resolved start, e.g. `1–16`. */
+export function sectionLabelRange(grid: SectionGrid, start: number): string {
+  const labels = generateSectionLabels(grid, start).flat().map(Number)
+  const first = Math.min(...labels)
+  const last = Math.max(...labels)
+  return first === last ? String(first) : `${first}–${last}`
+}
+
 function normaliseStart(start: number | undefined): number {
   if (start === undefined || !Number.isFinite(start)) return 0
   return Math.max(0, Math.trunc(start))

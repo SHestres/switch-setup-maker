@@ -3,10 +3,10 @@ import type { MouseEvent } from 'react'
 
 import { switchLabel } from '@/model/document'
 import { sectionRows } from '@/model/layout'
+import { portKey } from '@/model/portRef'
 import type { Port, PortRef, Row, Section, Switch } from '@/model/types'
 
 import { portAriaLabel } from './faceplateLayout'
-import { portKey } from './portRef'
 
 export interface FaceplateProps {
   switch_: Switch
@@ -15,7 +15,7 @@ export interface FaceplateProps {
   selected?: boolean
   /** Preview only: transparent, no controls and no handlers, so it cannot be wired or selected. */
   ghost?: boolean
-  /** Connected ports as `switch:port` keys, so jacks can show a wired fill. */
+  /** Connected Ports as `switch:port` keys, so each shows a wired connector fill. */
   connectedPorts?: ReadonlySet<string>
   /** This switch's port that starts the pending wire, when one is being drawn. */
   pendingPortId?: string | null
@@ -39,6 +39,14 @@ export function Faceplate({
 }: FaceplateProps) {
   const { sections } = switch_.layout
   const name = switchLabel(switch_)
+  const portScope: PortScope = {
+    switchId: switch_.id,
+    switchName: name,
+    ghost,
+    connectedPorts,
+    pendingPortId,
+    onPortClick,
+  }
 
   return (
     <div
@@ -78,15 +86,7 @@ export function Faceplate({
                 {index > 0 && (
                   <span className={tight ? 'sec-gap tight' : 'sec-gap'} aria-hidden="true" />
                 )}
-                <SectionView
-                  section={section}
-                  switchId={switch_.id}
-                  switchName={name}
-                  ghost={ghost}
-                  connectedPorts={connectedPorts}
-                  pendingPortId={pendingPortId}
-                  onPortClick={onPortClick}
-                />
+                <SectionView section={section} scope={portScope} />
               </Fragment>
             )
           })}
@@ -104,50 +104,29 @@ export function Faceplate({
   )
 }
 
-interface SectionProps {
-  section: Section
+/**
+ * The switch-wide values every Port renders from, threaded as one object so
+ * SectionView and PortRow stay pass-through layers instead of listing six props.
+ */
+interface PortScope {
   switchId: string
   switchName: string
-  ghost?: boolean
+  ghost: boolean
   connectedPorts?: ReadonlySet<string>
-  pendingPortId?: string | null
+  pendingPortId: string | null
   onPortClick?: (ref: PortRef) => void
 }
 
-function SectionView({
-  section,
-  switchId,
-  switchName,
-  ghost,
-  connectedPorts,
-  pendingPortId,
-  onPortClick,
-}: SectionProps) {
+function SectionView({ section, scope }: { section: Section; scope: PortScope }) {
   return (
     <div className="section">
       {pairRows(sectionRows(section)).map(([top, bottom], index) => (
         <Fragment key={index}>
           <LabelRow row={top} />
-          <PortRow
-            row={top}
-            switchId={switchId}
-            switchName={switchName}
-            ghost={ghost}
-            connectedPorts={connectedPorts}
-            pendingPortId={pendingPortId}
-            onPortClick={onPortClick}
-          />
+          <PortRow row={top} scope={scope} />
           {bottom && (
             <Fragment>
-              <PortRow
-                row={bottom}
-                switchId={switchId}
-                switchName={switchName}
-                ghost={ghost}
-                connectedPorts={connectedPorts}
-                pendingPortId={pendingPortId}
-                onPortClick={onPortClick}
-              />
+              <PortRow row={bottom} scope={scope} />
               <LabelRow row={bottom} />
             </Fragment>
           )}
@@ -157,68 +136,24 @@ function SectionView({
   )
 }
 
-interface PortRowProps {
-  row: Row
-  switchId: string
-  switchName: string
-  ghost?: boolean
-  connectedPorts?: ReadonlySet<string>
-  pendingPortId?: string | null
-  onPortClick?: (ref: PortRef) => void
-}
-
-function PortRow({
-  row,
-  switchId,
-  switchName,
-  ghost,
-  connectedPorts,
-  pendingPortId,
-  onPortClick,
-}: PortRowProps) {
+function PortRow({ row, scope }: { row: Row; scope: PortScope }) {
   return (
     <div className="row">
       {row.ports.map((port) => (
-        <PortButton
-          key={port.id}
-          port={port}
-          switchId={switchId}
-          switchName={switchName}
-          ghost={ghost}
-          connectedPorts={connectedPorts}
-          pendingPortId={pendingPortId}
-          onPortClick={onPortClick}
-        />
+        <PortButton key={port.id} port={port} scope={scope} />
       ))}
     </div>
   )
 }
 
-interface PortButtonProps {
-  port: Port
-  switchId: string
-  switchName: string
-  ghost?: boolean
-  connectedPorts?: ReadonlySet<string>
-  pendingPortId?: string | null
-  onPortClick?: (ref: PortRef) => void
-}
-
-function PortButton({
-  port,
-  switchId,
-  switchName,
-  ghost,
-  connectedPorts,
-  pendingPortId,
-  onPortClick,
-}: PortButtonProps) {
+function PortButton({ port, scope }: { port: Port; scope: PortScope }) {
+  const { switchId, switchName, ghost, connectedPorts, pendingPortId, onPortClick } = scope
   const kind = port.kind === 'sfp+' ? 'sfpp' : port.kind
   const isCage = port.kind !== 'rj45'
   const content = (
     <>
       <span className="led" />
-      <span className="jack" />
+      <span className="connector" />
       {isCage && <span className="latch" />}
     </>
   )

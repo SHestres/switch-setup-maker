@@ -125,7 +125,7 @@ describe('Canvas', () => {
     )
   })
 
-  it('marks connected ports so their jack fill changes, both ends of the wire', () => {
+  it('marks connected ports so their connector fill changes, both ends of the wire', () => {
     render(<Canvas document={sampleDocument()} />)
 
     expect(screen.getByRole('button', { name: 'RJ45 port 1 (1G) on Core' })).toHaveClass(

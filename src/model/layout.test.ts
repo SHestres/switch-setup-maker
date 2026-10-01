@@ -7,6 +7,7 @@ import {
   relabelSections,
   removePortsFromSwitch,
   resolveSectionStarts,
+  sectionLabelRange,
   sectionRows,
 } from './layout'
 import type { SectionSpec } from './layout'
@@ -115,6 +116,36 @@ describe('generateSectionLabels', () => {
       ['0', '2', '4', '6', '8', '10'],
       ['1', '3', '5', '7', '9', '11'],
     ])
+  })
+})
+
+// The span is the labels' numeric extent: a bottom-first pair starts on its
+// top row, so its first label is not its lowest one.
+describe('sectionLabelRange', () => {
+  it('spans a top-first alternating section', () => {
+    expect(sectionLabelRange({ rows: 2, columns: 8, numbering: 'alternating-top-first' }, 1)).toBe(
+      '1–16',
+    )
+  })
+
+  it('spans a bottom-first alternating section from its lowest to its highest label', () => {
+    expect(
+      sectionLabelRange({ rows: 2, columns: 8, numbering: 'alternating-bottom-first' }, 1),
+    ).toBe('1–16')
+  })
+
+  it('spans a pinned bottom-first section from its custom start', () => {
+    expect(
+      sectionLabelRange({ rows: 2, columns: 4, numbering: 'alternating-bottom-first' }, 5),
+    ).toBe('5–12')
+  })
+
+  it('spans a sequential section', () => {
+    expect(sectionLabelRange({ rows: 2, columns: 3, numbering: 'sequential' }, 7)).toBe('7–12')
+  })
+
+  it('shows a single label without a dash', () => {
+    expect(sectionLabelRange({ rows: 1, columns: 1, numbering: 'sequential' }, 3)).toBe('3')
   })
 })
 

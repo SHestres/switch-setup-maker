@@ -7,6 +7,7 @@ import {
 } from './document'
 import { generateSectionLabels, nextPortId, relabelSections, resolveSectionStarts } from './layout'
 import type { SectionSpec } from './layout'
+import { portKey } from './portRef'
 import type {
   CableLayer,
   Connection,
@@ -133,11 +134,18 @@ function readDocument(value: unknown): SetupDocument {
 function readSetup(value: unknown): Setup {
   if (!isObject(value)) fail('"setup" must be an object.')
 
-  const switches = readSwitches(value.switches)
+  const switches = readSwitchList(value.switches, readSwitch)
   return { switches, connections: readConnections(value.connections, switches) }
 }
 
-function readSwitches(value: unknown): Switch[] {
+/**
+ * Read a switch array, rejecting duplicate ids. Version 1 and 2 differ only in
+ * how one switch's layout is read, so the array handling is shared.
+ */
+function readSwitchList(
+  value: unknown,
+  readOne: (raw: JsonObject, where: string) => Switch,
+): Switch[] {
   if (value === undefined) return []
   if (!Array.isArray(value)) fail('"setup.switches" must be an array.')
 
@@ -150,7 +158,7 @@ function readSwitches(value: unknown): Switch[] {
     if (ids.has(id)) fail(`${where} repeats the switch id "${id}".`)
     ids.add(id)
 
-    return readSwitch(raw, where)
+    return readOne(raw, where)
   })
 }
 
@@ -201,29 +209,40 @@ function readSection(value: unknown, where: string, portIds: Set<string>): Secti
       : readOneOf(value.startMode, SECTION_START_MODES, `${where}.startMode`)
   const start = value.start === undefined ? 0 : readStartNumber(value.start, `${where}.start`)
 
-  if (!Array.isArray(value.ports) || value.ports.length === 0) {
-    fail(`${where} needs at least one port.`)
+  const ports = readPorts(value.ports, where, portIds)
+  if (ports.length !== rows * columns) {
+    fail(`${where} declares ${rows} rows × ${columns} columns but carries ${ports.length} ports.`)
   }
-  if (value.ports.length !== rows * columns) {
-    fail(
-      `${where} declares ${rows} rows × ${columns} columns but carries ${value.ports.length} ports.`,
-    )
-  }
-
-  const ports = value.ports.map((port, index) => {
-    const read = readPort(port, `${where}.ports[${index}]`, portIds)
-    if (read.kind !== kind) {
-      fail(`${where}.ports[${index}].kind "${read.kind}" must match the section's kind "${kind}".`)
-    }
-    if (read.speed !== speed) {
-      fail(
-        `${where}.ports[${index}].speed "${read.speed}" must match the section's speed "${speed}".`,
-      )
-    }
-    return read
-  })
+  assertPortsMatch(ports, { kind, speed }, where, 'section')
 
   return { kind, speed, rows, columns, numbering, startMode, start, ports }
+}
+
+/** Read a non-empty port array; port ids are unique across the whole switch. */
+function readPorts(value: unknown, where: string, portIds: Set<string>): Port[] {
+  if (!Array.isArray(value) || value.length === 0) fail(`${where} needs at least one port.`)
+  return value.map((port, index) => readPort(port, `${where}.ports[${index}]`, portIds))
+}
+
+/** A Section, like a version 1 row, carries exactly one kind and one speed. */
+function assertPortsMatch(
+  ports: readonly Port[],
+  expected: { kind: PortKind; speed: PortSpeed },
+  where: string,
+  owner: 'section' | 'row',
+): void {
+  for (const [index, port] of ports.entries()) {
+    if (port.kind !== expected.kind) {
+      fail(
+        `${where}.ports[${index}].kind "${port.kind}" must match the ${owner}'s kind "${expected.kind}".`,
+      )
+    }
+    if (port.speed !== expected.speed) {
+      fail(
+        `${where}.ports[${index}].speed "${port.speed}" must match the ${owner}'s speed "${expected.speed}".`,
+      )
+    }
+  }
 }
 
 function readPort(value: unknown, where: string, portIds: Set<string>): Port {
@@ -317,10 +336,6 @@ function readViewport(value: unknown): Viewport {
   }
 }
 
-function portKey(ref: PortRef): string {
-  return `${ref.switch}\u0000${ref.port}`
-}
-
 /* ----------------------------------------------------------------------------------------------
  * Version 1 migration
  *
@@ -376,25 +391,8 @@ function readV1Document(value: JsonObject): SetupDocument {
 function readV1Setup(value: unknown): Setup {
   if (!isObject(value)) fail('"setup" must be an object.')
 
-  const switches = readV1Switches(value.switches)
+  const switches = readSwitchList(value.switches, readV1Switch)
   return { switches, connections: readConnections(value.connections, switches) }
-}
-
-function readV1Switches(value: unknown): Switch[] {
-  if (value === undefined) return []
-  if (!Array.isArray(value)) fail('"setup.switches" must be an array.')
-
-  const ids = new Set<string>()
-  return value.map((raw, index) => {
-    const where = `switches[${index}]`
-    if (!isObject(raw)) fail(`${where} must be an object.`)
-
-    const id = readRequiredString(raw.id, `${where}.id`)
-    if (ids.has(id)) fail(`${where} repeats the switch id "${id}".`)
-    ids.add(id)
-
-    return readV1Switch(raw, where)
-  })
 }
 
 function readV1Switch(raw: JsonObject, where: string): Switch {
@@ -438,24 +436,9 @@ function readV1Row(value: unknown, where: string, portIds: Set<string>): V1Row {
       ? undefined
       : readOneOf(value.numbering, V1_ROW_NUMBERINGS, `${where}.numbering`)
 
-  if (!Array.isArray(value.ports) || value.ports.length === 0) {
-    fail(`${where} needs at least one port.`)
-  }
-
-  const ports = value.ports.map((port, index) =>
-    readPort(port, `${where}.ports[${index}]`, portIds),
-  )
+  const ports = readPorts(value.ports, where, portIds)
   // A version 2 Section carries one kind and one speed, so a mixed row cannot be mapped.
-  const kind = ports[0].kind
-  const speed = ports[0].speed
-  for (const [index, port] of ports.entries()) {
-    if (port.kind !== kind) {
-      fail(`${where}.ports[${index}].kind "${port.kind}" must match the row's kind "${kind}".`)
-    }
-    if (port.speed !== speed) {
-      fail(`${where}.ports[${index}].speed "${port.speed}" must match the row's speed "${speed}".`)
-    }
-  }
+  assertPortsMatch(ports, ports[0], where, 'row')
 
   return numbering === undefined ? { ports } : { numbering, ports }
 }

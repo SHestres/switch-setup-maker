@@ -14,6 +14,8 @@ const MIN_DRAG_HEIGHT = 170
 const AUTO_HEIGHT_FALLBACK = 320
 /** The panel never grows past this share of the viewport. */
 const MAX_VIEWPORT_SHARE = 0.7
+/** Below this, the handle was clicked, not dragged: auto-fit keeps ownership. */
+const RESIZE_THRESHOLD = 4
 
 function maxHeight(): number {
   return window.innerHeight * MAX_VIEWPORT_SHARE
@@ -22,7 +24,7 @@ function maxHeight(): number {
 /**
  * The full-width bottom panel: never modal, never resizes or re-fits the canvas
  * it overlays. Its height auto-fits the content on open and on every change
- * until the user drags the top edge, which takes over for the session.
+ * until the user drags the top edge; a click alone does not take over.
  */
 export function Inspector({ title, onClose, children }: InspectorProps) {
   const panelRef = useRef<HTMLElement | null>(null)
@@ -51,7 +53,6 @@ export function Inspector({ title, onClose, children }: InspectorProps) {
 
   const startResize = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault()
-    touchedRef.current = true
     const panel = panelRef.current
     const startHeight = Math.round(
       panel?.getBoundingClientRect().height ||
@@ -61,7 +62,11 @@ export function Inspector({ title, onClose, children }: InspectorProps) {
     const startY = event.clientY
 
     const handleMove = (moveEvent: globalThis.MouseEvent) => {
-      const next = startHeight + startY - moveEvent.clientY
+      const moved = startY - moveEvent.clientY
+      // A twitch is still a click: only a real drag hands the session over.
+      if (!touchedRef.current && Math.abs(moved) < RESIZE_THRESHOLD) return
+      touchedRef.current = true
+      const next = startHeight + moved
       setHeight(Math.round(Math.min(Math.max(next, MIN_DRAG_HEIGHT), maxHeight())))
     }
     const handleUp = () => {

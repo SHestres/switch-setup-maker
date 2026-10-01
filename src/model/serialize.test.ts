@@ -271,6 +271,16 @@ describe('migrating version 1', () => {
     if (result.ok) return
     expect(result.error).toContain('kind')
   })
+
+  it('rejects a version 1 row that mixes speeds, which a Section cannot carry', () => {
+    const result = parseDocument(
+      v1Document([{ ports: [port('p1', '1'), port('p2', '2', 'rj45', '10G')] }]),
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('speed')
+  })
 })
 
 describe('tolerance', () => {

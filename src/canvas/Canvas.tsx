@@ -4,15 +4,15 @@ import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import type { ReactZoomPanPinchContentRef, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
 
 import { sameRef } from '@/model/connections'
+import { portKey } from '@/model/portRef'
 import type { Connection, PortRef, SetupDocument, Switch, Viewport } from '@/model/types'
 
 import { Faceplate } from './Faceplate'
 import { PendingWire } from './PendingWire'
 import { WireHint } from './WireHint'
 import { WireLayer } from './WireLayer'
-import type { Point } from './geometry'
+import type { MovedSwitch, Point } from './geometry'
 import type { Size } from './placement'
-import { portKey } from './portRef'
 import type { WireHintState } from './wiring'
 import './faceplate.css'
 
@@ -21,12 +21,6 @@ export const CANVAS_CONTENT_ID = 'canvas-content'
 const DRAG_THRESHOLD = 4
 const MIN_ZOOM = 0.3
 const MAX_ZOOM = 4
-
-interface DragPosition {
-  id: string
-  x: number
-  y: number
-}
 
 export interface CanvasProps {
   document: SetupDocument
@@ -101,7 +95,7 @@ export function Canvas({
   const transformStateRef = useRef({ x: viewport.x, y: viewport.y, zoom: viewport.zoom })
   const movedRef = useRef(false)
   const suppressClickRef = useRef(false)
-  const [drag, setDrag] = useState<DragPosition | null>(null)
+  const [drag, setDrag] = useState<MovedSwitch | null>(null)
   const cablesLayer = (
     <WireLayer
       setup={document.setup}
@@ -188,7 +182,7 @@ export function Canvas({
     const startY = event.clientY
     const originX = switch_.x
     const originY = switch_.y
-    let latest: DragPosition | null = null
+    let latest: MovedSwitch | null = null
 
     const handleMove = (moveEvent: globalThis.MouseEvent) => {
       const dx = moveEvent.clientX - startX
