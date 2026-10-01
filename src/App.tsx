@@ -157,9 +157,7 @@ export default function App() {
 
   const startBlank = () => {
     setDraft(
-      createDraftSwitch(
-        placeNewSwitch(document.ui.viewport, canvasSize, document.setup.switches.length),
-      ),
+      createDraftSwitch(placeNewSwitch(document.ui.viewport, canvasSize, document.setup.switches)),
     )
     setInspector({ mode: 'draft' })
   }
@@ -180,11 +178,7 @@ export default function App() {
 
   const addFromPreset = (preset: LayoutPreset) => {
     const id = nextSwitchId(document.setup.switches)
-    const position = placeNewSwitch(
-      document.ui.viewport,
-      canvasSize,
-      document.setup.switches.length,
-    )
+    const position = placeNewSwitch(document.ui.viewport, canvasSize, document.setup.switches)
     const switch_ = switchFromPreset(preset, id, position)
     setDocument((current) => ({
       ...current,

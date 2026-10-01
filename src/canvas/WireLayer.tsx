@@ -2,10 +2,13 @@ import { samePair } from '@/model/connections'
 import type { Connection, Setup } from '@/model/types'
 
 import { connectionCurve, connectionMidpoint } from './geometry'
+import type { MovedSwitch } from './geometry'
 import { portKey } from './portRef'
 
 export interface WireLayerProps {
   setup: Setup
+  /** The Switch being dragged: its live position replaces the model one this frame. */
+  moved?: MovedSwitch | null
   /** The selected Connection, by unordered pair; ephemeral UI state. */
   selected?: Connection | null
   /** Select a cable. Never opens the Switch inspector. */
@@ -23,17 +26,18 @@ export interface WireLayerProps {
  */
 export function WireLayer({
   setup,
+  moved = null,
   selected = null,
   onSelectConnection,
   onDeleteConnection,
 }: WireLayerProps) {
-  const midpoint = selected ? connectionMidpoint(setup, selected) : undefined
+  const midpoint = selected ? connectionMidpoint(setup, selected, moved) : undefined
 
   return (
     <>
       <svg className="wire-layer" data-testid="wire-layer" aria-hidden="true" width={1} height={1}>
         {setup.connections.map((connection) => {
-          const d = connectionCurve(setup, connection)
+          const d = connectionCurve(setup, connection, moved)
           if (!d) return null
           const key = connectionKey(connection)
           const isSelected = selected !== null && samePair(connection, selected.a, selected.b)

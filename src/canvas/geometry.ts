@@ -30,6 +30,13 @@ export interface Point {
   y: number
 }
 
+/** A Switch mid-gesture: its live top-left replaces the model's until gesture end. */
+export interface MovedSwitch {
+  id: string
+  x: number
+  y: number
+}
+
 /** Vertical gap under which two ports count as level and the wire hangs below them. */
 const LEVEL_GAP = 24
 /** Smallest sag under a pair of level ports. */
@@ -73,6 +80,11 @@ function mainBankHeight(rows: readonly Row[]): number {
     pairs * 2 * (LABEL_ROW_HEIGHT + ROW_HEIGHT) +
     (rows.length % 2) * (LABEL_ROW_HEIGHT + ROW_HEIGHT)
   )
+}
+
+/** The face content's rendered height: the chassis field, or the tallest bank when it overflows. */
+function faceContentHeight(...bankHeights: number[]): number {
+  return Math.max(FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y, ...bankHeights)
 }
 
 function mainRowTop(index: number): number {
@@ -136,10 +148,7 @@ function placedBanks(switch_: Switch): FaceplateBank[] {
 
   const gap = banks.length > 1 ? BANK_GAP * (banks.length - 1) : 0
   const contentWidth = banks.reduce((total, bank) => total + bank.width, 0) + gap
-  const contentHeight = Math.max(
-    FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y,
-    ...banks.map((bank) => bank.height),
-  )
+  const contentHeight = faceContentHeight(...banks.map((bank) => bank.height))
 
   // The portfield centres the rendered banks; so does the group's top padding.
   let cursor = portfieldLeft + (portfieldWidth - contentWidth) / 2
@@ -152,14 +161,19 @@ function placedBanks(switch_: Switch): FaceplateBank[] {
 }
 
 /** Where a port's tile centre sits in canvas coordinates, or undefined if absent. */
-export function portAnchor(switch_: Switch, portId: string): Point | undefined {
+export function portAnchor(
+  switch_: Switch,
+  portId: string,
+  moved?: MovedSwitch | null,
+): Point | undefined {
+  const origin = moved?.id === switch_.id ? moved : switch_
   for (const bank of placedBanks(switch_)) {
     for (let index = 0; index < bank.rows.length; index++) {
       const column = bank.rows[index].ports.findIndex((port) => port.id === portId)
       if (column === -1) continue
       return {
-        x: switch_.x + bank.left + column * PORT_PITCH + PORT_PITCH / 2,
-        y: switch_.y + bank.top + bank.rowTop(index) + bank.rowHeight / 2,
+        x: origin.x + bank.left + column * PORT_PITCH + PORT_PITCH / 2,
+        y: origin.y + bank.top + bank.rowTop(index) + bank.rowHeight / 2,
       }
     }
   }
@@ -173,8 +187,7 @@ function round2(value: number): number {
 /** The rendered faceplate height, mirroring the CSS box (border-box, 89px minimum). */
 function faceHeight(switch_: Switch): number {
   const { main, left, right } = splitBanks(switch_.layout.rows)
-  const contentHeight = Math.max(
-    FACE_HEIGHT - 2 * FACE_BORDER - 2 * FACE_PADDING_Y,
+  const contentHeight = faceContentHeight(
     mainBankHeight(main),
     uplinkBankHeight(left),
     uplinkBankHeight(right),
@@ -194,16 +207,17 @@ function baseSag(a: Point, b: Point): number {
  * vertical exits are preserved. Raising the dip can bring it under another
  * faceplate, so the scan repeats to a fixed point (bounded by the switch count).
  */
-function clearanceSag(setup: Setup, a: Point, b: Point): number {
+function clearanceSag(setup: Setup, a: Point, b: Point, moved?: MovedSwitch | null): number {
   const midX = (a.x + b.x) / 2
   const baseY = (a.y + b.y) / 2
   let lowest = baseY + baseSag(a, b) * SAG_LOWEST_SHARE
   for (let pass = 0; pass <= setup.switches.length; pass++) {
     let raised = false
     for (const switch_ of setup.switches) {
-      if (midX < switch_.x || midX > switch_.x + RACK_WIDTH) continue
-      const bottom = switch_.y + faceHeight(switch_)
-      if (lowest >= switch_.y && lowest < bottom + SAG_CLEARANCE) {
+      const origin = moved?.id === switch_.id ? moved : switch_
+      if (midX < origin.x || midX > origin.x + RACK_WIDTH) continue
+      const bottom = origin.y + faceHeight(switch_)
+      if (lowest >= origin.y && lowest < bottom + SAG_CLEARANCE) {
         lowest = bottom + SAG_CLEARANCE
         raised = true
       }
@@ -214,8 +228,8 @@ function clearanceSag(setup: Setup, a: Point, b: Point): number {
 }
 
 /** The extra sag a settled cable needs so it stays clickable in behind mode. */
-function faceplateClearance(setup: Setup, a: Point, b: Point): number {
-  return Math.abs(b.y - a.y) <= LEVEL_GAP ? clearanceSag(setup, a, b) : 0
+function faceplateClearance(setup: Setup, a: Point, b: Point, moved?: MovedSwitch | null): number {
+  return Math.abs(b.y - a.y) <= LEVEL_GAP ? clearanceSag(setup, a, b, moved) : 0
 }
 
 /** The two control points of the cable between `a` and `b`, at least `minSag` deep. */
@@ -262,23 +276,35 @@ export function wirePoint(a: Point, b: Point, t: number, minSag = 0): Point {
 }
 
 /** The SVG path for one Connection, or undefined when a referenced Port is gone. */
-export function connectionCurve(setup: Setup, connection: Connection): string | undefined {
-  const a = pointForPort(setup, connection.a)
-  const b = pointForPort(setup, connection.b)
+export function connectionCurve(
+  setup: Setup,
+  connection: Connection,
+  moved?: MovedSwitch | null,
+): string | undefined {
+  const a = pointForPort(setup, connection.a, moved)
+  const b = pointForPort(setup, connection.b, moved)
   if (!a || !b) return undefined
-  return wireCurve(a, b, faceplateClearance(setup, a, b))
+  return wireCurve(a, b, faceplateClearance(setup, a, b, moved))
 }
 
 /** The curve midpoint of one Connection, where selection affordances anchor. */
-export function connectionMidpoint(setup: Setup, connection: Connection): Point | undefined {
-  const a = pointForPort(setup, connection.a)
-  const b = pointForPort(setup, connection.b)
+export function connectionMidpoint(
+  setup: Setup,
+  connection: Connection,
+  moved?: MovedSwitch | null,
+): Point | undefined {
+  const a = pointForPort(setup, connection.a, moved)
+  const b = pointForPort(setup, connection.b, moved)
   if (!a || !b) return undefined
-  return wirePoint(a, b, 0.5, faceplateClearance(setup, a, b))
+  return wirePoint(a, b, 0.5, faceplateClearance(setup, a, b, moved))
 }
 
 /** Where a Port ref's anchor sits in canvas coordinates, when it exists. */
-export function pointForPort(setup: Setup, ref: PortRef): Point | undefined {
+export function pointForPort(
+  setup: Setup,
+  ref: PortRef,
+  moved?: MovedSwitch | null,
+): Point | undefined {
   const switch_ = findSwitch(setup, ref.switch)
-  return switch_ ? portAnchor(switch_, ref.port) : undefined
+  return switch_ ? portAnchor(switch_, ref.port, moved) : undefined
 }

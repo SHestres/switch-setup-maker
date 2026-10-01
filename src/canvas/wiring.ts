@@ -8,7 +8,7 @@ import type { Point } from './geometry'
  */
 
 /** The wire being drawn: from a Port to the pointer (or the Port when idle). */
-export interface PendingWire {
+export interface PendingWireState {
   from: PortRef
   to?: Point
 }

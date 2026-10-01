@@ -273,4 +273,17 @@ describe('connectionCurve', () => {
       }),
     ).toBeUndefined()
   })
+
+  it('follows a switch mid-drag when given its live position', () => {
+    const setup = sampleDocument().setup
+    const connection = setup.connections[0]
+
+    // Core's p1 anchor sits at (509, 409). Moving the switch 100 down puts it
+    // at (509, 509); Edge's p2 at (1073.5, 449) is now clearly above, so the
+    // exit flips to a mirrored S while the other end stays put.
+    expect(connectionCurve(setup, connection, { id: 'sw1', x: 120, y: 460 })).toBe(
+      'M 509 509 C 509 479, 1073.5 479, 1073.5 449',
+    )
+    expect(connectionCurve(setup, connection)).toBe('M 509 409 C 509 429, 1073.5 429, 1073.5 449')
+  })
 })
