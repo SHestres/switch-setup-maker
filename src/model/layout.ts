@@ -1,112 +1,159 @@
 import type {
-  GeneratedNumberingPreset,
   Port,
   PortKind,
   PortLayout,
   PortSpeed,
   Row,
-  RowNumbering,
+  Section,
+  SectionNumbering,
+  SectionStartMode,
   Switch,
 } from './types'
 
-/** The builder's view of a row before ports exist: a count, a kind, a speed and a numbering choice. */
-export interface RowSpec {
-  count: number
+/** The builder's view of a section before ports exist: a grid, one kind, speed and numbering. */
+export interface SectionSpec {
+  rows: number
+  columns: number
   kind: PortKind
   speed: PortSpeed
-  /** Only meaningful on rows after the first; absent means `continue`. */
-  numbering?: RowNumbering
+  numbering: SectionNumbering
+  startMode: SectionStartMode
+  /** Required for `custom`; recomputed from the chain for `auto`. */
+  start?: number
 }
 
-/** Where each convention starts counting. */
-const BASE: Record<GeneratedNumberingPreset, number> = {
-  'odd-top-even-bottom': 1,
-  sequential: 1,
-  'even-top-zero-based': 0,
+/** The grid facts a label generation needs; Sections and specs both carry them. */
+export interface SectionGrid {
+  rows: number
+  columns: number
+  numbering: SectionNumbering
 }
 
 /**
- * Generate printed labels for a whole layout.
+ * Generate printed labels for one Section.
  *
- * `sequential` counts across each row in turn. The two column-pair conventions pair each
- * consecutive pair of rows and hand out numbers down the columns (top port first), which for
- * a base of 1 yields odd-top/even-bottom and for a base of 0 yields Juniper's even-top/odd-bottom.
- * A row that starts over opens a new column-pair group and resets the count to the convention's base.
+ * `sequential` counts across each row in turn. The two alternating conventions pair each
+ * consecutive pair of rows and hand out numbers down the columns — the chosen row takes the
+ * start number and both rows step by 2 — then continue after that span. A trailing unpaired
+ * row is treated as the top of its own pair.
  */
-export function generateLabels(
-  preset: GeneratedNumberingPreset,
-  rows: readonly RowSpec[],
-): string[][] {
-  const labels: string[][] = rows.map(() => [])
-  let next = BASE[preset]
+export function generateSectionLabels(grid: SectionGrid, start: number): string[][] {
+  const labels: string[][] = []
 
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]
-    if (index > 0 && row.numbering === 'start-over') next = BASE[preset]
-
-    if (preset === 'sequential') {
-      for (let column = 0; column < row.count; column += 1) labels[index].push(String(next++))
-      continue
+  if (grid.numbering === 'sequential') {
+    let next = start
+    for (let row = 0; row < grid.rows; row += 1) {
+      const rowLabels: string[] = []
+      for (let column = 0; column < grid.columns; column += 1) rowLabels.push(String(next++))
+      labels.push(rowLabels)
     }
-
-    const bottomIndex = index + 1
-    const bottom =
-      bottomIndex < rows.length && rows[bottomIndex].numbering !== 'start-over'
-        ? rows[bottomIndex]
-        : undefined
-
-    const width = bottom ? Math.max(row.count, bottom.count) : row.count
-    for (let column = 0; column < width; column += 1) {
-      if (column < row.count) labels[index].push(String(next++))
-      if (bottom && column < bottom.count) labels[bottomIndex].push(String(next++))
-    }
-
-    if (bottom) index += 1
+    return labels
   }
 
+  const bottomFirst = grid.numbering === 'alternating-bottom-first'
+  let base = start
+  for (let row = 0; row < grid.rows; row += 2) {
+    const top: string[] = []
+    const bottom: string[] = []
+    for (let column = 0; column < grid.columns; column += 1) {
+      top.push(String(bottomFirst ? base + 1 + 2 * column : base + 2 * column))
+      bottom.push(String(bottomFirst ? base + 2 * column : base + 1 + 2 * column))
+    }
+    labels.push(top)
+    if (row + 1 < grid.rows) labels.push(bottom)
+    base += 2 * grid.columns
+  }
   return labels
 }
 
-/** Build ports (with fresh stable ids) from a row-builder draft. */
-export function materialiseRows(preset: GeneratedNumberingPreset, rows: readonly RowSpec[]): Row[] {
-  const labels = generateLabels(preset, rows)
-  let portNumber = 0
+/** The span a Section's printed labels cover at a resolved start, e.g. `1–16`. */
+export function sectionLabelRange(grid: SectionGrid, start: number): string {
+  const labels = generateSectionLabels(grid, start).flat().map(Number)
+  const first = Math.min(...labels)
+  const last = Math.max(...labels)
+  return first === last ? String(first) : `${first}–${last}`
+}
 
-  return rows.map((row, index) => {
-    const materialised: Row = {
-      ports: labels[index].map((label) => ({
-        id: `p${(portNumber += 1)}`,
-        label,
-        kind: row.kind,
-        speed: row.speed,
-      })),
-    }
-    if (index > 0 && row.numbering !== undefined) materialised.numbering = row.numbering
-    return materialised
+function normalizeStart(start: number | undefined): number {
+  if (start === undefined || !Number.isFinite(start)) return 0
+  return Math.max(0, Math.trunc(start))
+}
+
+/**
+ * Resolve every Section's start in one pass: an `auto` Section starts at the previous
+ * Section's highest label + 1 (the first starts at 1); a `custom` Section uses its stored
+ * start. Returns the start numbers in section order.
+ */
+export function resolveSectionStarts(sections: readonly SectionSpec[]): number[] {
+  let next = 1
+  return sections.map((section) => {
+    const start = section.startMode === 'custom' ? normalizeStart(section.start) : next
+    const labels = generateSectionLabels(section, start).flat()
+    const highest = labels.reduce((max, label) => Math.max(max, Number(label)), start - 1)
+    next = highest + 1
+    return start
   })
 }
 
-/** Regenerate every printed label under the layout's current convention, keeping port ids. */
-export function relabelRows(layout: PortLayout): Row[] {
-  if (layout.numbering === 'custom') return layout.rows
+/** Build Sections (with fresh stable ids) from a section-builder draft. */
+export function materializeSections(specs: readonly SectionSpec[]): Section[] {
+  const starts = resolveSectionStarts(specs)
+  let portNumber = 0
 
-  const labels = generateLabels(
-    layout.numbering,
-    layout.rows.map((row, index) => ({
-      count: row.ports.length,
-      kind: row.ports[0].kind,
-      speed: row.ports[0].speed,
-      ...(index > 0 && row.numbering !== undefined ? { numbering: row.numbering } : {}),
-    })),
-  )
-
-  return layout.rows.map((row, index) => ({
-    ...row,
-    ports: row.ports.map((port, column) => ({ ...port, label: labels[index][column] })),
+  return specs.map((spec, index) => ({
+    kind: spec.kind,
+    speed: spec.speed,
+    rows: spec.rows,
+    columns: spec.columns,
+    numbering: spec.numbering,
+    startMode: spec.startMode,
+    start: starts[index],
+    ports: generateSectionLabels(spec, starts[index])
+      .flat()
+      .map((label) => ({
+        id: `p${(portNumber += 1)}`,
+        label,
+        kind: spec.kind,
+        speed: spec.speed,
+      })),
   }))
 }
 
-/** Remove ports from a switch, dropping any row left empty. Connections are the caller's concern. */
+/**
+ * Regenerate every Section's labels and resolved start under its current convention,
+ * keeping port ids and pinned custom starts.
+ */
+export function relabelSections(layout: PortLayout): Section[] {
+  const starts = resolveSectionStarts(layout.sections)
+
+  return layout.sections.map((section, index) => {
+    const labels = generateSectionLabels(section, starts[index]).flat()
+    return {
+      ...section,
+      start: starts[index],
+      ports: section.ports.map((port, position) => ({
+        ...port,
+        label: labels[position] ?? port.label,
+      })),
+    }
+  })
+}
+
+/** The Section's ports sliced into faceplate rows, row by row. */
+export function sectionRows(section: Section): Row[] {
+  const rows: Row[] = []
+  for (let index = 0; index < section.rows; index += 1) {
+    const ports = section.ports.slice(index * section.columns, (index + 1) * section.columns)
+    if (ports.length > 0) rows.push({ ports })
+  }
+  return rows
+}
+
+/**
+ * Remove ports from a switch, dropping any Section left empty. Defensive cascade helper:
+ * production layout edits rebuild Sections through `planLayoutEdit`, so a partial removal
+ * here is only ever an intermediate state. Connections are the caller's concern.
+ */
 export function removePortsFromSwitch(switch_: Switch, portIds: Iterable<string>): Switch {
   const removed = new Set(portIds)
 
@@ -114,9 +161,12 @@ export function removePortsFromSwitch(switch_: Switch, portIds: Iterable<string>
     ...switch_,
     layout: {
       ...switch_.layout,
-      rows: switch_.layout.rows
-        .map((row) => ({ ...row, ports: row.ports.filter((port) => !removed.has(port.id)) }))
-        .filter((row) => row.ports.length > 0),
+      sections: switch_.layout.sections
+        .map((section) => ({
+          ...section,
+          ports: section.ports.filter((port) => !removed.has(port.id)),
+        }))
+        .filter((section) => section.ports.length > 0),
     },
   }
 }

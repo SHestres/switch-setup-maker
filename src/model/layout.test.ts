@@ -1,191 +1,329 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  generateLabels,
-  materialiseRows,
+  generateSectionLabels,
+  materializeSections,
   nextPortId,
-  relabelRows,
+  relabelSections,
   removePortsFromSwitch,
+  resolveSectionStarts,
+  sectionLabelRange,
+  sectionRows,
 } from './layout'
-import type { RowSpec } from './layout'
-import type { Port, Switch } from './types'
+import type { SectionSpec } from './layout'
+import type { Port, Section, Switch } from './types'
 
-function spec(count: number, overrides: Partial<RowSpec> = {}): RowSpec {
-  return { count, kind: 'rj45', speed: '1G', ...overrides }
-}
-
-function switchWith(rows: Switch['layout']['rows']): Switch {
+function spec(overrides: Partial<SectionSpec> = {}): SectionSpec {
   return {
-    id: 'sw1',
-    name: '',
-    model: '',
-    x: 0,
-    y: 0,
-    layout: { numbering: 'odd-top-even-bottom', rows },
+    rows: 2,
+    columns: 2,
+    kind: 'rj45',
+    speed: '1G',
+    numbering: 'alternating-top-first',
+    startMode: 'auto',
+    ...overrides,
   }
 }
 
-function ports(labels: string[]): Port[] {
-  return labels.map((label, index) => ({
-    id: `p${index + 1}`,
-    label,
-    kind: 'rj45',
-    speed: '1G',
-  }))
+function switchWith(sections: Section[]): Switch {
+  return { id: 'sw1', name: '', model: '', x: 0, y: 0, layout: { sections } }
 }
 
-// Each example below comes from the preset table in ticket 06 — an outside source
-// of truth, not a recomputation of the implementation.
-describe('generateLabels', () => {
-  it('pairs odd numbers on top and even numbers on the bottom (Cisco et al.)', () => {
-    const labels = generateLabels('odd-top-even-bottom', [spec(5), spec(5)])
+// Each example below comes from the ticket and the spec's preset table — an outside
+// source of truth, not a recomputation of the implementation.
+describe('generateSectionLabels', () => {
+  it('alternates down each pair of rows, the top row taking the start (Cisco et al.)', () => {
+    const labels = generateSectionLabels(
+      { rows: 2, columns: 8, numbering: 'alternating-top-first' },
+      1,
+    )
 
     expect(labels).toEqual([
-      ['1', '3', '5', '7', '9'],
-      ['2', '4', '6', '8', '10'],
+      ['1', '3', '5', '7', '9', '11', '13', '15'],
+      ['2', '4', '6', '8', '10', '12', '14', '16'],
     ])
   })
 
-  it('runs sequential rows (patch-panel style)', () => {
-    const labels = generateLabels('sequential', [spec(5), spec(5)])
+  it('alternates from the bottom row first', () => {
+    const labels = generateSectionLabels(
+      { rows: 2, columns: 8, numbering: 'alternating-bottom-first' },
+      1,
+    )
 
     expect(labels).toEqual([
-      ['1', '2', '3', '4', '5'],
-      ['6', '7', '8', '9', '10'],
+      ['2', '4', '6', '8', '10', '12', '14', '16'],
+      ['1', '3', '5', '7', '9', '11', '13', '15'],
     ])
   })
 
-  it('pairs even numbers on top, odd on the bottom, from zero (Juniper)', () => {
-    const labels = generateLabels('even-top-zero-based', [spec(5), spec(5)])
+  it('counts sequentially across each row in turn (patch-panel style)', () => {
+    const labels = generateSectionLabels({ rows: 2, columns: 3, numbering: 'sequential' }, 1)
 
     expect(labels).toEqual([
-      ['0', '2', '4', '6', '8'],
-      ['1', '3', '5', '7', '9'],
+      ['1', '2', '3'],
+      ['4', '5', '6'],
     ])
   })
 
-  it('numbers a 12×1G + 2×SFP switch: the SFP row starts over (1, 2)', () => {
-    const labels = generateLabels('odd-top-even-bottom', [
-      spec(6),
-      spec(6),
-      spec(2, { kind: 'sfp', speed: '1G', numbering: 'start-over' }),
-    ])
+  it('continues the span after each pair of rows', () => {
+    const labels = generateSectionLabels(
+      { rows: 4, columns: 2, numbering: 'alternating-top-first' },
+      1,
+    )
 
-    expect(labels[2]).toEqual(['1', '2'])
+    expect(labels).toEqual([
+      ['1', '3'],
+      ['2', '4'],
+      ['5', '7'],
+      ['6', '8'],
+    ])
   })
 
-  it('numbers a 12×1G + 2×SFP Juniper switch: the SFP row starts over (0, 1)', () => {
-    const labels = generateLabels('even-top-zero-based', [
-      spec(6),
-      spec(6),
-      spec(2, { kind: 'sfp', speed: '1G', numbering: 'start-over' }),
+  it('continues the span after each pair of rows, bottom first', () => {
+    const labels = generateSectionLabels(
+      { rows: 4, columns: 2, numbering: 'alternating-bottom-first' },
+      1,
+    )
+
+    expect(labels).toEqual([
+      ['2', '4'],
+      ['1', '3'],
+      ['6', '8'],
+      ['5', '7'],
     ])
+  })
+
+  it('treats a trailing unpaired row as the top of its own pair', () => {
+    const labels = generateSectionLabels(
+      { rows: 3, columns: 2, numbering: 'alternating-top-first' },
+      1,
+    )
+
+    expect(labels).toEqual([
+      ['1', '3'],
+      ['2', '4'],
+      ['5', '7'],
+    ])
+  })
+
+  it('honours a custom start (12×1G + 2×SFP: zero-based)', () => {
+    const labels = generateSectionLabels(
+      { rows: 2, columns: 6, numbering: 'alternating-top-first' },
+      0,
+    )
 
     expect(labels).toEqual([
       ['0', '2', '4', '6', '8', '10'],
       ['1', '3', '5', '7', '9', '11'],
-      ['0', '1'],
     ])
-  })
-
-  it('numbers a Unifi 48 Port: the single SFP+ row continues (49–52)', () => {
-    const labels = generateLabels('odd-top-even-bottom', [
-      spec(24),
-      spec(24),
-      spec(4, { kind: 'sfp+', speed: '10G', numbering: 'continue' }),
-    ])
-
-    expect(labels[2]).toEqual(['49', '50', '51', '52'])
-  })
-
-  it('numbers a 24×1G + 4×SFP+ switch: the 2×2 SFP+ block continues (25–28)', () => {
-    const labels = generateLabels('odd-top-even-bottom', [
-      spec(12),
-      spec(12),
-      spec(2, { kind: 'sfp+', speed: '10G', numbering: 'continue' }),
-      spec(2, { kind: 'sfp+', speed: '10G', numbering: 'continue' }),
-    ])
-
-    expect(labels[2]).toEqual(['25', '27'])
-    expect(labels[3]).toEqual(['26', '28'])
   })
 })
 
-describe('materialiseRows', () => {
-  it('builds rows of ports with stable sequential ids and generated labels', () => {
-    const rows = materialiseRows('odd-top-even-bottom', [spec(2), spec(2)])
+// The span is the labels' numeric extent: a bottom-first pair starts on its
+// top row, so its first label is not its lowest one.
+describe('sectionLabelRange', () => {
+  it('spans a top-first alternating section', () => {
+    expect(sectionLabelRange({ rows: 2, columns: 8, numbering: 'alternating-top-first' }, 1)).toBe(
+      '1–16',
+    )
+  })
 
-    expect(rows).toEqual([
+  it('spans a bottom-first alternating section from its lowest to its highest label', () => {
+    expect(
+      sectionLabelRange({ rows: 2, columns: 8, numbering: 'alternating-bottom-first' }, 1),
+    ).toBe('1–16')
+  })
+
+  it('spans a pinned bottom-first section from its custom start', () => {
+    expect(
+      sectionLabelRange({ rows: 2, columns: 4, numbering: 'alternating-bottom-first' }, 5),
+    ).toBe('5–12')
+  })
+
+  it('spans a sequential section', () => {
+    expect(sectionLabelRange({ rows: 2, columns: 3, numbering: 'sequential' }, 7)).toBe('7–12')
+  })
+
+  it('shows a single label without a dash', () => {
+    expect(sectionLabelRange({ rows: 1, columns: 1, numbering: 'sequential' }, 3)).toBe('3')
+  })
+})
+
+describe('resolveSectionStarts', () => {
+  it('chains auto sections: the first starts at 1, each next after the previous highest', () => {
+    const starts = resolveSectionStarts([
+      spec({ rows: 2, columns: 8 }),
+      spec({ rows: 2, columns: 2, numbering: 'sequential' }),
+    ])
+
+    expect(starts).toEqual([1, 17])
+  })
+
+  it('pins custom starts and continues after them', () => {
+    const starts = resolveSectionStarts([
+      spec({ rows: 2, columns: 8 }),
+      spec({ rows: 2, columns: 2, numbering: 'sequential', startMode: 'custom', start: 100 }),
+      spec({ rows: 1, columns: 2, numbering: 'sequential' }),
+    ])
+
+    expect(starts).toEqual([1, 100, 104])
+  })
+
+  it('chains from the highest label of a multi-pair section', () => {
+    const starts = resolveSectionStarts([
+      spec({ rows: 4, columns: 2 }),
+      spec({ rows: 1, columns: 1 }),
+    ])
+
+    expect(starts).toEqual([1, 9])
+  })
+
+  it('keeps a pinned zero-based section at 0 while the following auto section chains', () => {
+    const starts = resolveSectionStarts([
+      spec({ rows: 2, columns: 6, startMode: 'custom', start: 0 }),
+      spec({ rows: 1, columns: 2, numbering: 'sequential', startMode: 'custom', start: 0 }),
+      spec({ rows: 1, columns: 1, numbering: 'sequential' }),
+    ])
+
+    expect(starts).toEqual([0, 0, 2])
+  })
+})
+
+describe('materializeSections', () => {
+  it('materializes every row×column port with generated labels and readable ids', () => {
+    const sections = materializeSections([
+      spec({ rows: 2, columns: 2 }),
+      spec({ rows: 2, columns: 2, numbering: 'sequential', startMode: 'custom', start: 7 }),
+    ])
+
+    expect(sections).toEqual([
       {
+        kind: 'rj45',
+        speed: '1G',
+        rows: 2,
+        columns: 2,
+        numbering: 'alternating-top-first',
+        startMode: 'auto',
+        start: 1,
         ports: [
           { id: 'p1', label: '1', kind: 'rj45', speed: '1G' },
           { id: 'p2', label: '3', kind: 'rj45', speed: '1G' },
-        ],
-      },
-      {
-        ports: [
           { id: 'p3', label: '2', kind: 'rj45', speed: '1G' },
           { id: 'p4', label: '4', kind: 'rj45', speed: '1G' },
         ],
       },
+      {
+        kind: 'rj45',
+        speed: '1G',
+        rows: 2,
+        columns: 2,
+        numbering: 'sequential',
+        startMode: 'custom',
+        start: 7,
+        ports: [
+          { id: 'p5', label: '7', kind: 'rj45', speed: '1G' },
+          { id: 'p6', label: '8', kind: 'rj45', speed: '1G' },
+          { id: 'p7', label: '9', kind: 'rj45', speed: '1G' },
+          { id: 'p8', label: '10', kind: 'rj45', speed: '1G' },
+        ],
+      },
     ])
   })
 
-  it('carries the rows’ continue/start-over choice into the materialised rows', () => {
-    const rows = materialiseRows('odd-top-even-bottom', [
-      spec(2),
-      spec(2, { numbering: 'start-over' }),
+  it('writes the resolved start onto every section, including auto ones', () => {
+    const sections = materializeSections([
+      spec({ rows: 2, columns: 8, startMode: 'custom', start: 33 }),
+      spec({ rows: 1, columns: 2, numbering: 'sequential' }),
     ])
 
-    expect(rows[0].numbering).toBeUndefined()
-    expect(rows[1].numbering).toBe('start-over')
+    expect(sections.map((section) => section.start)).toEqual([33, 49])
   })
 })
 
-describe('relabelRows', () => {
-  it('regenerates labels under a new convention without touching port ids', () => {
-    const original = switchWith(materialiseRows('odd-top-even-bottom', [spec(3), spec(3)]))
-    const relabelled = relabelRows({ ...original.layout, numbering: 'sequential' })
+describe('relabelSections', () => {
+  it('regenerates labels for a changed convention without touching port ids', () => {
+    const sections = materializeSections([spec({ rows: 2, columns: 2 })])
+    const changed = sections.map((section) => ({ ...section, numbering: 'sequential' as const }))
 
-    expect(relabelled[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p3'])
-    expect(relabelled[0].ports.map((port) => port.label)).toEqual(['1', '2', '3'])
-    expect(relabelled[1].ports.map((port) => port.label)).toEqual(['4', '5', '6'])
+    const relabelled = relabelSections({ sections: changed })
+
+    expect(relabelled[0].ports.map((port) => port.id)).toEqual(['p1', 'p2', 'p3', 'p4'])
+    expect(relabelled[0].ports.map((port) => port.label)).toEqual(['1', '2', '3', '4'])
   })
 
-  it('leaves custom labels alone', () => {
-    const layout = { numbering: 'custom' as const, rows: [{ ports: ports(['Core 1', 'Core 2']) }] }
+  it('renumbers following auto sections after an earlier custom start moves', () => {
+    const sections = materializeSections([
+      spec({ rows: 2, columns: 2 }),
+      spec({ rows: 1, columns: 1, numbering: 'sequential' }),
+    ])
+    expect(sections[1].start).toBe(5)
 
-    expect(relabelRows(layout)).toBe(layout.rows)
+    const pinned = sections.map((section, index) =>
+      index === 0 ? { ...section, startMode: 'custom' as const, start: 10 } : section,
+    )
+
+    const relabelled = relabelSections({ sections: pinned })
+
+    expect(relabelled[0].ports.map((port) => port.label)).toEqual(['10', '12', '11', '13'])
+    expect(relabelled[1].start).toBe(14)
+    expect(relabelled[1].ports.map((port) => port.label)).toEqual(['14'])
+  })
+
+  it('keeps a later custom section pinned when an earlier section changes', () => {
+    const sections = materializeSections([
+      spec({ rows: 2, columns: 2 }),
+      spec({ rows: 1, columns: 1, numbering: 'sequential', startMode: 'custom', start: 50 }),
+    ])
+    const changed = sections.map((section, index) =>
+      index === 0 ? { ...section, numbering: 'sequential' as const } : section,
+    )
+
+    const relabelled = relabelSections({ sections: changed })
+
+    expect(relabelled[0].ports.map((port) => port.label)).toEqual(['1', '2', '3', '4'])
+    expect(relabelled[1].start).toBe(50)
+    expect(relabelled[1].ports.map((port) => port.label)).toEqual(['50'])
+  })
+})
+
+describe('sectionRows', () => {
+  it('slices the materialized grid into faceplate rows, row by row', () => {
+    const [section] = materializeSections([spec({ rows: 2, columns: 2 })])
+
+    expect(sectionRows(section).map((row) => row.ports.map((port) => port.label))).toEqual([
+      ['1', '3'],
+      ['2', '4'],
+    ])
   })
 })
 
 describe('removePortsFromSwitch', () => {
-  it('drops the ports but keeps rows that still have some', () => {
-    const original = switchWith(materialiseRows('odd-top-even-bottom', [spec(3), spec(3)]))
+  it('drops a section once its last port is gone while the others stay', () => {
+    const original = switchWith(
+      materializeSections([spec({ rows: 1, columns: 2 }), spec({ rows: 1, columns: 1 })]),
+    )
 
-    const updated = removePortsFromSwitch(original, ['p1'])
+    const updated = removePortsFromSwitch(original, ['p1', 'p2'])
 
-    expect(updated.layout.rows).toHaveLength(2)
-    expect(updated.layout.rows[0].ports.map((port) => port.id)).toEqual(['p2', 'p3'])
+    expect(updated.layout.sections).toHaveLength(1)
+    expect(updated.layout.sections[0].ports.map((port) => port.id)).toEqual(['p3'])
   })
 
-  it('removes a row once its last port is gone', () => {
-    const original = switchWith(materialiseRows('odd-top-even-bottom', [spec(3), spec(1)]))
+  it('keeps sections that still have ports', () => {
+    const original = switchWith(materializeSections([spec({ rows: 1, columns: 3 })]))
+    const [section] = original.layout.sections
 
-    const updated = removePortsFromSwitch(original, ['p4'])
+    const updated = removePortsFromSwitch(original, [section.ports[0].id])
 
-    expect(updated.layout.rows).toHaveLength(1)
+    expect(updated.layout.sections).toHaveLength(1)
+    expect(updated.layout.sections[0].ports.map((port) => port.id)).toEqual(['p2', 'p3'])
   })
 })
 
 describe('nextPortId', () => {
   it('counts one past the highest existing suffix', () => {
-    const existing = ports(['1', '2', '3']).concat({
-      id: 'p48',
-      label: '48',
-      kind: 'rj45',
-      speed: '1G',
-    })
+    const existing: Port[] = materializeSections([spec({ rows: 2, columns: 2 })])[0].ports
+    existing.push({ id: 'p48', label: '48', kind: 'rj45', speed: '1G' })
 
     expect(nextPortId(existing)).toBe('p49')
   })

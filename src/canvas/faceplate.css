@@ -1,0 +1,570 @@
+/*
+ * Canvas and faceplate skin (canvas layer). The default block is the light
+ * "diagrammatic" theme; [data-theme='dark'] (photoreal) and
+ * [data-theme='blueprint'] override these variables on the same root.
+ */
+
+.canvas-root {
+  --tile-w: 27px;
+  --rack-width: 880px;
+  --canvas-bg: #eef1f5;
+  --canvas-grid-image: radial-gradient(circle, #ccd6e0 1px, transparent 1.1px);
+  --canvas-grid-size: 22px 22px;
+  --face-bg: #ffffff;
+  --face-radius: 8px;
+  --face-border: 1px solid #d9dfe7;
+  --face-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 5px 14px rgba(16, 24, 40, 0.05);
+  --connector-bg: #f1f4f8;
+  --connector-border: 1px solid #cbd5e1;
+  --connector-radius: 3px;
+  --connector-shadow: none;
+  --connector-connected-bg: #aab6c4;
+  --latch-bg: #94a3b8;
+  --led-off: #d7dde5;
+  --led-on: #22c55e;
+  --led-glow: 0 0 5px rgba(34, 197, 94, 0.6);
+  --led-socket: none;
+  --accent: #3b82f6;
+  --text: #3b4654;
+  /* Micro print (.num) needs >= 4.5:1 on the white face. */
+  --muted: #64748b;
+  --num: #64748b;
+  /* The switch tag sits on the canvas background, not the face. */
+  --tag: #5b6b7f;
+  --wire: #7c8899;
+  --wire-hover: #ef4444;
+  --wire-width: 2.5;
+  --ear-bg: #e3e8ee;
+  --ear-border: 1px solid #d3dae3;
+  --screw-bg: #c1cad5;
+  --screw-shadow: none;
+  --vents-opacity: 0.35;
+  --sfp-bg: #334155;
+  --sfp-border: #243244;
+  --sfp-connected-bg: #5a6b80;
+  --sfp-image: none;
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  background-color: var(--canvas-bg);
+  background-image: var(--canvas-grid-image);
+  background-size: var(--canvas-grid-size);
+}
+
+.canvas-stage {
+  position: relative;
+  width: 1px;
+  height: 1px;
+}
+
+/*
+ * One SVG for every Connection, drawn inside the canvas transform. Its 1x1
+ * viewport grows visually via `overflow: visible`. Whether it paints above or
+ * behind the faceplates is decided by the Canvas's layer order; the ephemeral
+ * pending wire lives in its own always-above layer.
+ */
+.canvas-root .wire-layer,
+.canvas-root .pending-wire-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-root .wire-layer path,
+.canvas-root .pending-wire-layer path {
+  fill: none;
+  stroke: var(--wire);
+  stroke-width: calc(var(--wire-width) * 1px);
+  stroke-linecap: round;
+}
+
+/* The invisible hit target over each cable: prototype-width, comfortably clickable. */
+.canvas-root .wire-layer path.wire-hit {
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* Hovering a cable highlights it, the prototype's cue that it is clickable. */
+.canvas-root .wire-layer g.wire:hover path.wire {
+  stroke: var(--wire-hover);
+}
+
+/* The selected cable, highlighted in the theme's wire highlight color. */
+.canvas-root .wire-layer path.selected {
+  stroke: var(--wire-hover);
+  stroke-width: calc(var(--wire-width) * 1.5 * 1px);
+}
+
+/* The mouse-only delete affordance, centered on the selected cable's midpoint. */
+.canvas-root .wire-actions {
+  position: absolute;
+  z-index: 6;
+  padding: 3px 8px;
+  border: 1px solid var(--wire-hover);
+  border-radius: 6px;
+  background: var(--face-bg);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+/* The ephemeral wire following the pointer: dashed, in the theme accent. */
+.canvas-root .pending-wire-layer path.pending {
+  stroke: var(--accent);
+  stroke-dasharray: 7 5;
+}
+
+/* A refusal hint anchored above the offending Port. */
+.canvas-root .wire-hint {
+  position: absolute;
+  z-index: 5;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #f9fafb;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 6px));
+}
+
+.canvas-root .switch {
+  position: absolute;
+  width: var(--rack-width);
+  user-select: none;
+}
+
+.canvas-root .sw-tag {
+  position: absolute;
+  top: -17px;
+  left: 3px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--tag);
+  white-space: nowrap;
+}
+
+.canvas-root .sw-tag b {
+  font-weight: 650;
+}
+
+.canvas-root .ears {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: var(--ear-bg);
+  border: var(--ear-border);
+}
+
+.canvas-root .ears.left {
+  left: -14px;
+  border-radius: 4px 0 0 4px;
+}
+
+.canvas-root .ears.right {
+  right: -14px;
+  border-radius: 0 4px 4px 0;
+}
+
+.canvas-root .screw {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--screw-bg);
+  box-shadow: var(--screw-shadow);
+}
+
+.canvas-root .screw.t {
+  top: 14%;
+}
+
+.canvas-root .screw.b {
+  bottom: 14%;
+}
+
+.canvas-root .face {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 89px;
+  /* 3px + the 1px border keeps the 48-port field at exactly 880px. */
+  padding: 5px 3px;
+  border: var(--face-border);
+  border-radius: var(--face-radius);
+  background: var(--face-bg);
+  box-shadow: var(--face-shadow);
+}
+
+.canvas-root .face,
+.canvas-root .sw-tag {
+  font-family: var(--face-font, inherit);
+}
+
+.canvas-root .switch.selected .face {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A draft preview: see-through and inert; the panel owns its only controls. */
+.canvas-root .switch.ghost {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.canvas-root .switch.ghost .face {
+  border-style: dashed;
+}
+
+.canvas-root .chrome {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.canvas-root .chrome.left {
+  width: 34px;
+  align-items: flex-start;
+  padding-right: 2px;
+}
+
+.canvas-root .chrome.right {
+  width: 74px;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.canvas-root .brand {
+  width: 10px;
+  height: 10px;
+  margin-top: 2px;
+  border: 1.5px solid var(--muted);
+  border-radius: 2px;
+  opacity: 0.7;
+}
+
+.canvas-root .status {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.canvas-root .sled {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--led-off);
+}
+
+.canvas-root .model {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.canvas-root .vents {
+  width: 30px;
+  height: 12px;
+  background: repeating-linear-gradient(180deg, var(--muted) 0 1px, transparent 1px 4px);
+  opacity: var(--vents-opacity);
+}
+
+.canvas-root .console {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.canvas-root .console i {
+  display: block;
+  border: var(--connector-border);
+  border-radius: 2px;
+  background: var(--connector-bg);
+  box-shadow: var(--connector-shadow);
+}
+
+.canvas-root .console .c-rj {
+  width: 16px;
+  height: 12px;
+}
+
+.canvas-root .console .c-usb {
+  width: 9px;
+  height: 12px;
+}
+
+.canvas-root .portfield {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+
+/* Sections render left to right; same-kind neighbours get a tighter gap. */
+.canvas-root .sec-gap {
+  flex: 0 0 auto;
+  width: 16px;
+}
+
+.canvas-root .sec-gap.tight {
+  width: 6px;
+}
+
+.canvas-root .section {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.canvas-root .row {
+  display: flex;
+  height: 24px;
+}
+
+.canvas-root .numrow {
+  display: flex;
+  height: 9px;
+}
+
+.canvas-root .num {
+  width: var(--tile-w);
+  font-size: 8px;
+  line-height: 9px;
+  color: var(--num);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-root .port {
+  position: relative;
+  width: var(--tile-w);
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.canvas-root .port .connector {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  bottom: 2px;
+  left: 2px;
+  border: var(--connector-border);
+  border-radius: var(--connector-radius);
+  background-color: var(--connector-bg);
+  box-shadow: var(--connector-shadow);
+}
+
+.canvas-root .port .led {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--led-off);
+  box-shadow: var(--led-socket);
+}
+
+.canvas-root .port.kind-sfp .connector,
+.canvas-root .port.kind-sfpp .connector {
+  top: 2px;
+  bottom: 2px;
+  border-color: var(--sfp-border);
+  background-color: var(--sfp-bg);
+  background-image: var(--sfp-image);
+}
+
+.canvas-root .port .latch {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 8px;
+  height: 2px;
+  margin-left: -4px;
+  border-radius: 1px;
+  background: var(--latch-bg);
+}
+
+.canvas-root .port:hover .connector {
+  border-color: var(--accent);
+}
+
+/* The Port a pending wire starts from. */
+.canvas-root .port.pending .connector {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.canvas-root .port:focus-visible .connector {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Wired ports: a distinct grey connector fill in addition to the lit LED. */
+.canvas-root .port.connected .connector {
+  background-color: var(--connector-connected-bg);
+}
+
+.canvas-root .port.kind-sfp.connected .connector,
+.canvas-root .port.kind-sfpp.connected .connector {
+  background-color: var(--sfp-connected-bg);
+}
+
+.canvas-root .port.connected .led {
+  background: var(--led-on);
+  box-shadow: var(--led-glow);
+}
+
+/*
+ * Dark "photoreal": metal-gradient bodies and sunken connectors. Per the spec the
+ * canvas keeps the light theme's dot grid, dark-tinted; prototype B has none.
+ */
+.canvas-root[data-theme='dark'] {
+  --canvas-bg: #101418;
+  --canvas-grid-image: radial-gradient(circle, #2b333e 1px, transparent 1.1px);
+  --face-bg: linear-gradient(180deg, #41474e 0%, #2c3137 55%, #22262b 100%);
+  --face-radius: 3px;
+  --face-border: 1px solid #0a0c0e;
+  --face-shadow: 0 12px 26px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --connector-bg: #0a0c0e;
+  --connector-border: 1px solid #181c1f;
+  --connector-radius: 2px;
+  --connector-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.85), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --connector-connected-bg: #3a444f;
+  --latch-bg: #8b96a3;
+  --led-off: #24292e;
+  --led-on: #3ee06a;
+  --led-glow: 0 0 7px rgba(62, 224, 106, 0.95);
+  --led-socket: inset 0 1px 1px rgba(0, 0, 0, 0.6);
+  --accent: #f59e0b;
+  --text: #cdd5de;
+  --muted: #8b96a3;
+  --num: #aab5c1;
+  --tag: #7d8a99;
+  --wire: #8b9daf;
+  --wire-hover: #ef4444;
+  --wire-width: 3.5;
+  --ear-bg: linear-gradient(180deg, #4b525a, #33383e);
+  --ear-border: 1px solid #14171a;
+  --screw-bg: radial-gradient(circle at 35% 30%, #9aa4ad, #3c4249 65%);
+  --screw-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  --vents-opacity: 0.5;
+  --sfp-bg: #050607;
+  --sfp-border: #6d7783;
+  --sfp-connected-bg: #2a3540;
+  --sfp-image: linear-gradient(180deg, #050607, #101316);
+}
+
+.canvas-root[data-theme='dark'] .port.kind-rj45 .connector {
+  border-bottom-color: #2c3238;
+}
+
+.canvas-root[data-theme='dark'] .model {
+  font-size: 7.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.canvas-root[data-theme='dark'] .num {
+  font-size: 7.5px;
+  font-weight: 600;
+}
+
+.canvas-root[data-theme='dark'] .sw-tag {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+
+/*
+ * Blueprint: technical drawing on blue with a 26px line grid, monospace
+ * labels and outlined, hatched SFP cages. The always-above cable layer is
+ * ticket 23's rule; the theme only supplies the wire tokens here.
+ */
+.canvas-root[data-theme='blueprint'] {
+  --canvas-bg: #0d2b4d;
+  --canvas-grid-image:
+    linear-gradient(rgba(159, 208, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(159, 208, 255, 0.09) 1px, transparent 1px);
+  --canvas-grid-size: 26px 26px;
+  --face-bg: rgba(255, 255, 255, 0.025);
+  --face-radius: 2px;
+  --face-border: 1.5px solid #bfe0ff;
+  --face-shadow: none;
+  --face-font: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --connector-bg: rgba(4, 18, 34, 0.35);
+  --connector-border: 1px solid #8ec6f5;
+  --connector-radius: 1px;
+  --connector-shadow: none;
+  --connector-connected-bg: rgba(125, 211, 252, 0.3);
+  --latch-bg: #7dd3fc;
+  --led-off: rgba(255, 255, 255, 0.1);
+  --led-on: #7dd3fc;
+  --led-glow: 0 0 6px rgba(125, 211, 252, 0.85);
+  --led-socket: none;
+  --accent: #facc15;
+  --text: #d7ecff;
+  --muted: #8db8dd;
+  --num: #a9cdec;
+  --tag: #8db8dd;
+  --wire: #7dd3fc;
+  --wire-hover: #facc15;
+  --wire-width: 2;
+  --ear-bg: rgba(255, 255, 255, 0.03);
+  --ear-border: 1px solid #8ec6f5;
+  --screw-bg: transparent;
+  --screw-shadow: inset 0 0 0 1px #8ec6f5;
+  --vents-opacity: 0.3;
+  --sfp-bg: rgba(4, 18, 34, 0.35);
+  --sfp-border: #8ec6f5;
+  --sfp-connected-bg: rgba(125, 211, 252, 0.22);
+  --sfp-image: repeating-linear-gradient(
+    45deg,
+    rgba(142, 198, 245, 0.35) 0 1px,
+    transparent 1px 4px
+  );
+}
+
+.canvas-root[data-theme='blueprint'] .screw {
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+}
+
+.canvas-root[data-theme='blueprint'] .port .latch {
+  height: 3px;
+  border: 1px solid #7dd3fc;
+  border-top: 0;
+  background: transparent;
+}

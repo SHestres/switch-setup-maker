@@ -22,7 +22,7 @@ describe('useDocument', () => {
     const { result } = renderHook(() => useDocument(fakeStorage()))
 
     expect(result.current.document.setup).toEqual({ switches: [], connections: [] })
-    expect(result.current.document.version).toBe(1)
+    expect(result.current.document.version).toBe(2)
   })
 
   it('autosaves every change', () => {

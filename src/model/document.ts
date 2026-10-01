@@ -37,8 +37,13 @@ export function findSwitch(setup: Setup, switchId: string): Switch | undefined {
 
 export function findPort(setup: Setup, ref: PortRef): Port | undefined {
   return findSwitch(setup, ref.switch)
-    ?.layout.rows.flatMap((row) => row.ports)
+    ?.layout.sections.flatMap((section) => section.ports)
     .find((port) => port.id === ref.port)
+}
+
+/** The label a switch is shown under: its name, else its model, else its id. */
+export function switchLabel(switch_: Switch): string {
+  return switch_.name || switch_.model || switch_.id
 }
 
 /** One past the highest `sw<n>` suffix in use. */
@@ -58,4 +63,45 @@ export function resetSetup(document: SetupDocument): SetupDocument {
     setup: { switches: [], connections: [] },
     ui: { ...document.ui, viewport: { ...DEFAULT_VIEWPORT } },
   }
+}
+
+/** Move one switch to a new top-left corner; other switches and the ui stay put. */
+export function moveSwitch(
+  document: SetupDocument,
+  switchId: string,
+  position: { x: number; y: number },
+): SetupDocument {
+  return {
+    ...document,
+    setup: {
+      ...document.setup,
+      switches: document.setup.switches.map((switch_) =>
+        switch_.id === switchId ? { ...switch_, ...position } : switch_,
+      ),
+    },
+  }
+}
+
+/** Replace one persisted `ui` preference without touching the rest of the ui state. */
+function setUi<Key extends keyof UiState>(
+  document: SetupDocument,
+  key: Key,
+  value: UiState[Key],
+): SetupDocument {
+  return { ...document, ui: { ...document.ui, [key]: value } }
+}
+
+/** Replace the persisted viewport without touching the rest of the ui state. */
+export function setViewport(document: SetupDocument, viewport: Viewport): SetupDocument {
+  return setUi(document, 'viewport', viewport)
+}
+
+/** Switch the persisted theme without touching the rest of the ui state. */
+export function setTheme(document: SetupDocument, theme: Theme): SetupDocument {
+  return setUi(document, 'theme', theme)
+}
+
+/** Switch the persisted cable layer without touching the rest of the ui state. */
+export function setCableLayer(document: SetupDocument, cableLayer: CableLayer): SetupDocument {
+  return setUi(document, 'cableLayer', cableLayer)
 }

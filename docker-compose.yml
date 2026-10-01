@@ -1,0 +1,15 @@
+# Self-hosting via Docker Compose. Builds the repo's Dockerfile and serves the
+# static app on 0.0.0.0. No configuration is required; PORT overrides both the
+# port the container listens on and the published host port, mirroring the
+# Dockerfile contract (`docker run -e PORT=3000 -p 3000:3000`).
+services:
+  app:
+    build: .
+    image: switch-setup-maker
+    container_name: switch-setup-maker
+    restart: unless-stopped
+    environment:
+      HOST: '0.0.0.0'
+      PORT: ${PORT:-8080}
+    ports:
+      - '${PORT:-8080}:${PORT:-8080}'

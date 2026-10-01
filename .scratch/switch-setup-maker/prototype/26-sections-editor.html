@@ -1,0 +1,1648 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Ticket: section-based switch editor (row editor redesign).
+  Question: what should the section editor look like, and how should sections render?
+  Plan: three structurally different variants of the inspector's section editor
+  (A horizontal cards / B dense table / C canvas-first), switchable via the floating
+  bar or ?variant=A|B|C, with the Unifi Pro Max 48-style faceplate rendering live
+  from the same section state. Not production code; no persistence, no tests.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PROTOTYPE — sections editor</title>
+    <style>
+      /* ---------- shell ---------- */
+      :root {
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #0f172a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+      }
+      .appbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 48px;
+        flex: 0 0 auto;
+        padding: 0 12px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #fff;
+        font-size: 13px;
+      }
+      .appbar .brand {
+        font-weight: 650;
+        margin-right: 10px;
+        white-space: nowrap;
+      }
+      .appbar .spacer {
+        flex: 1;
+      }
+      .btn {
+        border: 1px solid #d9dfe7;
+        background: #fff;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        color: inherit;
+      }
+      .btn + .btn {
+        margin-left: 6px;
+      }
+      .main {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* ---------- canvas + faceplate (mirrors src/canvas/faceplate.css) ---------- */
+      .canvas-root {
+        --tile-w: 27px;
+        --rack-width: 880px;
+        --canvas-bg: #eef1f5;
+        --canvas-grid-image: radial-gradient(circle, #ccd6e0 1px, transparent 1.1px);
+        --canvas-grid-size: 22px 22px;
+        --face-bg: #ffffff;
+        --face-radius: 8px;
+        --face-border: 1px solid #d9dfe7;
+        --face-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 5px 14px rgba(16, 24, 40, 0.05);
+        --jack-bg: #f1f4f8;
+        --jack-border: 1px solid #cbd5e1;
+        --jack-radius: 3px;
+        --led-off: #d7dde5;
+        --accent: #3b82f6;
+        --text: #3b4654;
+        --muted: #64748b;
+        --num: #64748b;
+        --tag: #5b6b7f;
+        --ear-bg: #e3e8ee;
+        --ear-border: 1px solid #d3dae3;
+        --screw-bg: #c1cad5;
+        --vents-opacity: 0.35;
+        --sfp-bg: #334155;
+        --sfp-border: #243244;
+        --latch-bg: #94a3b8;
+
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        background-color: var(--canvas-bg);
+        background-image: var(--canvas-grid-image);
+        background-size: var(--canvas-grid-size);
+      }
+      .canvas-root[data-theme='dark'] {
+        --canvas-bg: #101418;
+        --canvas-grid-image: radial-gradient(circle, #2b333e 1px, transparent 1.1px);
+        --face-bg: linear-gradient(180deg, #41474e 0%, #2c3137 55%, #22262b 100%);
+        --face-radius: 3px;
+        --face-border: 1px solid #0a0c0e;
+        --jack-bg: #0a0c0e;
+        --jack-border: 1px solid #181c1f;
+        --jack-radius: 2px;
+        --led-off: #24292e;
+        --accent: #f59e0b;
+        --text: #cdd5de;
+        --muted: #8b96a3;
+        --num: #aab5c1;
+        --tag: #7d8a99;
+        --ear-bg: linear-gradient(180deg, #4b525a, #33383e);
+        --ear-border: 1px solid #14171a;
+        --screw-bg: radial-gradient(circle at 35% 30%, #9aa4ad, #3c4249 65%);
+        --vents-opacity: 0.5;
+        --sfp-bg: #050607;
+        --sfp-border: #6d7783;
+        --latch-bg: #8b96a3;
+      }
+      .canvas-root[data-theme='blueprint'] {
+        --canvas-bg: #0d2b4d;
+        --canvas-grid-image:
+          linear-gradient(rgba(159, 208, 255, 0.09) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(159, 208, 255, 0.09) 1px, transparent 1px);
+        --canvas-grid-size: 26px 26px;
+        --face-bg: rgba(255, 255, 255, 0.025);
+        --face-radius: 2px;
+        --face-border: 1.5px solid #bfe0ff;
+        --jack-bg: rgba(4, 18, 34, 0.35);
+        --jack-border: 1px solid #8ec6f5;
+        --jack-radius: 1px;
+        --led-off: rgba(255, 255, 255, 0.1);
+        --accent: #facc15;
+        --text: #d7ecff;
+        --muted: #8db8dd;
+        --num: #a9cdec;
+        --tag: #8db8dd;
+        --ear-bg: rgba(255, 255, 255, 0.03);
+        --ear-border: 1px solid #8ec6f5;
+        --screw-bg: transparent;
+        --vents-opacity: 0.3;
+        --sfp-bg: rgba(4, 18, 34, 0.35);
+        --sfp-border: #8ec6f5;
+        --latch-bg: #7dd3fc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .switch {
+        position: absolute;
+        left: 56px;
+        top: 110px;
+        width: var(--rack-width);
+        user-select: none;
+      }
+      .sw-tag {
+        position: absolute;
+        top: -17px;
+        left: 3px;
+        font-size: 10px;
+        letter-spacing: 0.02em;
+        color: var(--tag);
+        white-space: nowrap;
+      }
+      .sw-tag b {
+        font-weight: 650;
+      }
+      .ears {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 18px;
+        background: var(--ear-bg);
+        border: var(--ear-border);
+      }
+      .ears.left {
+        left: -14px;
+        border-radius: 4px 0 0 4px;
+      }
+      .ears.right {
+        right: -14px;
+        border-radius: 0 4px 4px 0;
+      }
+      .screw {
+        position: absolute;
+        left: 50%;
+        width: 6px;
+        height: 6px;
+        margin-left: -3px;
+        border-radius: 50%;
+        background: var(--screw-bg);
+      }
+      .screw.t {
+        top: 14%;
+      }
+      .screw.b {
+        bottom: 14%;
+      }
+      .face {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        width: 100%;
+        min-height: 89px;
+        padding: 5px 3px;
+        border: var(--face-border);
+        border-radius: var(--face-radius);
+        background: var(--face-bg);
+        box-shadow: var(--face-shadow);
+      }
+      .chrome {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .chrome.left {
+        width: 34px;
+        align-items: flex-start;
+        padding-right: 2px;
+      }
+      .chrome.right {
+        width: 74px;
+        align-items: flex-end;
+        text-align: right;
+      }
+      .brand {
+        width: 10px;
+        height: 10px;
+        margin-top: 2px;
+        border: 1.5px solid var(--muted);
+        border-radius: 2px;
+        opacity: 0.7;
+      }
+      .status {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .sled {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--led-off);
+      }
+      .model {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        font-size: 8px;
+        letter-spacing: 0.04em;
+        color: var(--text);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .vents {
+        width: 30px;
+        height: 12px;
+        background: repeating-linear-gradient(180deg, var(--muted) 0 1px, transparent 1px 4px);
+        opacity: var(--vents-opacity);
+      }
+      .console {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .console i {
+        display: block;
+        border: var(--jack-border);
+        border-radius: 2px;
+        background: var(--jack-bg);
+      }
+      .console .c-rj {
+        width: 16px;
+        height: 12px;
+      }
+      .console .c-usb {
+        width: 9px;
+        height: 12px;
+      }
+
+      /* The portfield holds sections left-to-right. Section gap = 2 x bank gap. */
+      .portfield {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        min-width: 0;
+      }
+      .sec-gap {
+        flex: 0 0 auto;
+      }
+      .section {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-radius: 4px;
+      }
+      .section.hl {
+        outline: 2px solid var(--accent);
+        outline-offset: 5px;
+      }
+      .section.selected {
+        outline: 2px dashed var(--accent);
+        outline-offset: 5px;
+      }
+      .row,
+      .numrow {
+        display: flex;
+        justify-content: center;
+      }
+      .row {
+        height: 24px;
+      }
+      .numrow {
+        height: 9px;
+      }
+      .num {
+        width: var(--tile-w);
+        font-size: 8px;
+        line-height: 9px;
+        color: var(--num);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .port {
+        position: relative;
+        width: var(--tile-w);
+        height: 24px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+      }
+      .port .jack {
+        position: absolute;
+        top: 4px;
+        right: 2px;
+        bottom: 2px;
+        left: 2px;
+        border: var(--jack-border);
+        border-radius: var(--jack-radius);
+        background-color: var(--jack-bg);
+      }
+      .port .led {
+        position: absolute;
+        top: 1px;
+        left: 3px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--led-off);
+      }
+      .port.kind-sfp .jack,
+      .port.kind-sfpp .jack {
+        top: 2px;
+        bottom: 2px;
+        border-color: var(--sfp-border);
+        background-color: var(--sfp-bg);
+      }
+      .port .latch {
+        position: absolute;
+        bottom: 3px;
+        left: 50%;
+        width: 8px;
+        height: 2px;
+        margin-left: -4px;
+        border-radius: 1px;
+        background: var(--latch-bg);
+      }
+
+      /* The + hotspots that insert sections, canvas-first variant only. */
+      .insert {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 24px;
+        margin: 0 -8px;
+        padding: 0;
+        border: 1px dashed var(--muted);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.35;
+        transition: opacity 0.12s;
+      }
+      .insert:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+        opacity: 1;
+      }
+      html[data-variant='C'] .insert {
+        display: inline-flex;
+      }
+      html[data-variant='C'] .section:hover + .insert {
+        opacity: 1;
+      }
+      html[data-variant='C'] .section {
+        cursor: pointer;
+      }
+
+      /* ---------- inspector ---------- */
+      .inspector {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        width: 400px;
+        border-left: 1px solid #e2e8f0;
+        background: #fff;
+        box-shadow: -10px 0 26px rgba(16, 24, 40, 0.07);
+      }
+      .inspector.bottom {
+        top: auto;
+        left: 0;
+        right: 0;
+        width: auto;
+        height: 250px;
+        border-left: 0;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -10px 26px rgba(16, 24, 40, 0.07);
+      }
+      .resize-handle {
+        position: absolute;
+        z-index: 3;
+      }
+      .resize-handle.side {
+        top: 0;
+        bottom: 0;
+        left: -3px;
+        width: 6px;
+        cursor: col-resize;
+      }
+      .resize-handle.bottom {
+        top: -3px;
+        left: 0;
+        right: 0;
+        height: 6px;
+        cursor: row-resize;
+      }
+      .inspector.bottom .insp-body {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 16px;
+        overflow: auto;
+      }
+      .inspector.bottom .insp-head {
+        padding: 8px 12px;
+      }
+      .d-side {
+        flex: 0 0 205px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+      }
+      .d-side .ident {
+        grid-template-columns: 1fr;
+      }
+      .d-cards {
+        flex: 1;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        overflow-x: auto;
+      }
+      .d-cards .sec-card {
+        flex: 1 1 0;
+        min-width: 186px;
+      }
+      .d-cards .add-card {
+        flex: 0 0 120px;
+        min-height: 150px;
+      }
+      .insp-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .insp-head .close {
+        margin-left: auto;
+        border: 0;
+        background: transparent;
+        font-size: 14px;
+        color: #64748b;
+        cursor: pointer;
+      }
+      .insp-body {
+        min-height: 0;
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .ident {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: #475569;
+      }
+      .field > span {
+        font-weight: 500;
+      }
+      .field input,
+      .field select {
+        width: 100%;
+        min-width: 0;
+        padding: 5px 6px;
+        border: 1px solid #d9dfe7;
+        border-radius: 6px;
+        background: #fff;
+        font: inherit;
+        color: inherit;
+        font-size: 12px;
+      }
+      .hint {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: #64748b;
+      }
+      .section-title {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      /* Variant A — horizontal cards */
+      .cards {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding: 4px 2px 10px;
+      }
+      .sec-card {
+        flex: 0 0 172px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid #d9dfe7;
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+      .sec-card .card-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .sec-card .range {
+        margin-right: auto;
+        font-size: 10px;
+        font-weight: 400;
+        color: #64748b;
+        font-variant-numeric: tabular-nums;
+      }
+      .card-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .card-actions {
+        display: flex;
+        gap: 4px;
+        justify-content: flex-end;
+      }
+      .mini-btn {
+        border: 1px solid #d9dfe7;
+        background: #fff;
+        border-radius: 5px;
+        padding: 2px 6px;
+        font-size: 11px;
+        line-height: 1.3;
+        color: #475569;
+        cursor: pointer;
+      }
+      .mini-btn:hover {
+        border-color: #94a3b8;
+      }
+      .add-card {
+        flex: 0 0 132px;
+        min-height: 150px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        background: transparent;
+        color: #64748b;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .add-card:hover {
+        border-color: #3b82f6;
+        color: #3b82f6;
+      }
+
+      /* Variant B — dense table */
+      .sec-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+      }
+      .sec-table th {
+        text-align: left;
+        font-weight: 600;
+        color: #64748b;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0 4px 6px;
+      }
+      .sec-table td {
+        padding: 3px 4px;
+        border-top: 1px solid #eef1f5;
+        vertical-align: middle;
+      }
+      .sec-table select,
+      .sec-table input {
+        width: 100%;
+        padding: 3px 4px;
+        border: 1px solid #d9dfe7;
+        border-radius: 5px;
+        font-size: 11.5px;
+        font-family: inherit;
+      }
+      .sec-table .seed {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .sec-table .grip {
+        color: #cbd5e1;
+      }
+      .totals {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: #64748b;
+      }
+      .add-row {
+        margin-top: 10px;
+        align-self: flex-start;
+      }
+
+      /* Variant C — canvas-first */
+      .selected-card {
+        border: 1px solid #d9dfe7;
+        border-radius: 8px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #fbfcfe;
+      }
+      .selected-card.empty {
+        border-style: dashed;
+        color: #64748b;
+        font-size: 12px;
+        background: transparent;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid #d9dfe7;
+        border-radius: 999px;
+        background: #fff;
+        padding: 3px 10px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .chip.current {
+        border-color: #3b82f6;
+        color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+      }
+
+      /* ---------- prototype switcher ---------- */
+      .proto-bar {
+        position: fixed;
+        left: 50%;
+        bottom: 16px;
+        transform: translateX(-50%);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #111827;
+        color: #f9fafb;
+        font-size: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      .proto-bar button {
+        border: 0;
+        background: rgba(255, 255, 255, 0.12);
+        color: inherit;
+        border-radius: 999px;
+        min-width: 26px;
+        height: 24px;
+        padding: 0 8px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .proto-bar button:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .proto-bar .tag {
+        background: #f59e0b;
+        color: #111827;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 10px;
+      }
+      .proto-bar .label {
+        min-width: 168px;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .bar-field {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        opacity: 0.9;
+      }
+      .bar-field select {
+        border: 1px solid #374151;
+        border-radius: 4px;
+        background: #1f2937;
+        color: inherit;
+        font: inherit;
+        font-size: 11px;
+        padding: 2px 4px;
+      }
+      .state-panel {
+        position: fixed;
+        left: 16px;
+        bottom: 16px;
+        z-index: 99;
+        max-width: 420px;
+        max-height: 300px;
+        overflow: auto;
+        margin: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #111827;
+        color: #d1fae5;
+        font-size: 11px;
+        line-height: 1.5;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="appbar">
+      <span class="brand">Switch Setup Maker</span>
+      <button class="btn" type="button">Import</button>
+      <button class="btn" type="button">Export</button>
+      <button class="btn" type="button">New setup</button>
+      <span class="spacer"></span>
+      <label class="field" style="flex-direction: row; align-items: center; gap: 6px">
+        <span style="font-size: 12px">Theme</span>
+        <select id="theme-select" style="padding: 4px 6px; border: 1px solid #d9dfe7; border-radius: 6px">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="blueprint">Blueprint</option>
+        </select>
+      </label>
+      <button class="btn" type="button">+ Add switch</button>
+    </div>
+
+    <div class="main">
+      <div class="canvas-root" id="canvas-root" data-theme="light">
+        <div class="switch" id="switch">
+          <div class="sw-tag"><b>Rack Floor 1</b> · Unifi Pro Max 48</div>
+          <div class="ears left"><i class="screw t"></i><i class="screw b"></i></div>
+          <div class="ears right"><i class="screw t"></i><i class="screw b"></i></div>
+          <div class="face">
+            <div class="chrome left">
+              <span class="brand"></span>
+              <span class="status"><i class="sled"></i><i class="sled"></i><i class="sled"></i></span>
+            </div>
+            <div class="portfield" id="portfield"></div>
+            <div class="chrome right">
+              <span class="model">USW-Pro-Max-48-PoE</span>
+              <span class="vents"></span>
+              <span class="console"><i class="c-rj"></i><i class="c-usb"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="inspector" id="inspector">
+        <div class="resize-handle side" id="resize-handle" title="Drag to resize"></div>
+        <header class="insp-head">Switch editor <button class="close" type="button">✕</button></header>
+        <div class="insp-body" id="insp-body"></div>
+      </aside>
+    </div>
+
+    <pre class="state-panel" id="state-panel" hidden></pre>
+
+    <div class="proto-bar">
+      <span class="tag">PROTOTYPE</span>
+      <button type="button" data-act="prev" title="Previous variant">‹</button>
+      <span class="label" id="proto-label">A · Horizontal cards</span>
+      <button type="button" data-act="next" title="Next variant">›</button>
+      <span style="opacity: 0.5">|</span>
+      <span class="bar-field">gap
+        <select id="gap-rule" title="Which sections group tightly">
+          <option value="kind">same kind</option>
+          <option value="kind-speed">kind + speed</option>
+          <option value="off">all 16px</option>
+        </select>
+      </span>
+      <span class="bar-field">tight
+        <select id="tight-gap" title="Gap between grouped sections">
+          <option value="4">4</option>
+          <option value="6">6</option>
+          <option value="6" selected>6</option>
+          <option value="12">12</option>
+        </select>
+      </span>
+      <button type="button" data-act="toggle-state" title="Show section state">{ }</button>
+      <button type="button" data-act="reset" title="Reset sections">reset</button>
+    </div>
+
+    <script>
+      // ---------- section state ----------
+      // The Pro Max 48 example: 32x 1G + 16x 2.5G + 4x 10G SFP+, as four
+      // two-row banks (8 rows) grouped into four sections.
+      const DEFAULT_SECTIONS = [
+        { id: 's1', kind: 'rj45', speed: '1G', rows: 2, cols: 8, numbering: 'interleaved', startMode: 'auto', start: 1 },
+        { id: 's2', kind: 'rj45', speed: '1G', rows: 2, cols: 8, numbering: 'interleaved', startMode: 'auto', start: 17 },
+        { id: 's3', kind: 'rj45', speed: '2.5G', rows: 2, cols: 8, numbering: 'interleaved', startMode: 'auto', start: 33 },
+        { id: 's4', kind: 'sfp+', speed: '10G', rows: 2, cols: 2, numbering: 'sequential', startMode: 'auto', start: 49 },
+      ];
+
+      const VARIANTS = [
+        { key: 'A', name: 'Cards · side', editor: 'cards', layout: 'side' },
+        { key: 'B', name: 'Table · side', editor: 'table', layout: 'side' },
+        { key: 'C', name: 'Canvas-first · side', editor: 'canvas', layout: 'side' },
+        { key: 'D', name: 'Cards · bottom panel', editor: 'cards', layout: 'bottom' },
+      ];
+
+      const KINDS = [
+        ['rj45', 'RJ45'],
+        ['sfp', 'SFP'],
+        ['sfp+', 'SFP+'],
+      ];
+      const SPEEDS = ['100M', '1G', '2.5G', '5G', '10G'];
+      const NUMBERINGS = [
+        ['interleaved', 'Alternating (top first)'],
+        ['sequential', 'Sequential'],
+        ['interleaved-bottom', 'Alternating (bottom first)'],
+      ];
+      const START_MODES = [
+        ['auto', 'Auto (end of previous)'],
+        ['custom', 'Custom'],
+      ];
+
+      let state = {
+        variant: new URLSearchParams(location.search).get('variant')?.toUpperCase() || 'D',
+        theme: 'light',
+        sections: DEFAULT_SECTIONS.map((s) => ({ ...s })),
+        selectedId: 's3',
+        showState: false,
+        gapRule: 'kind',
+        tightGap: 6,
+        sideWidth: 400,
+        bottomHeight: 250,
+        bottomHeightTouched: false,
+      };
+      if (!VARIANTS.some((v) => v.key === state.variant)) state.variant = 'D';
+      let nextId = 10;
+
+      const portfield = document.getElementById('portfield');
+      const inspBody = document.getElementById('insp-body');
+      const inspector = document.getElementById('inspector');
+      const resizeHandle = document.getElementById('resize-handle');
+      const canvasRoot = document.getElementById('canvas-root');
+      const statePanel = document.getElementById('state-panel');
+      const protoLabel = document.getElementById('proto-label');
+
+      // ---------- labels ----------
+      function labelsFor(s, start) {
+        const grid = [];
+        if (s.numbering === 'sequential') {
+          let n = start;
+          for (let r = 0; r < s.rows; r++) {
+            const row = [];
+            for (let c = 0; c < s.cols; c++) row.push(n++);
+            grid.push(row);
+          }
+          return grid;
+        }
+        // Interleaved: within each pair of rows, one row takes the start number
+        // and both rows step by 2; the next pair continues after the pair's span.
+        const bottomFirst = s.numbering === 'interleaved-bottom';
+        let base = start;
+        for (let r = 0; r < s.rows; r += 2) {
+          const top = [];
+          const bottom = [];
+          for (let c = 0; c < s.cols; c++) {
+            top.push(bottomFirst ? base + 1 + 2 * c : base + 2 * c);
+            bottom.push(bottomFirst ? base + 2 * c : base + 1 + 2 * c);
+          }
+          grid.push(top);
+          if (r + 1 < s.rows) grid.push(bottom);
+          base += 2 * s.cols;
+        }
+        return grid;
+      }
+
+      // Effective starts are resolved in one sequential pass: an 'auto' section
+      // continues after the previous section's highest label (the first is 1);
+      // a 'custom' section uses its stored start.
+      function effectiveStarts() {
+        let next = 1;
+        return state.sections.map((s) => {
+          const start = s.startMode === 'custom' ? Math.max(0, parseInt(s.start, 10) || 0) : next;
+          const labels = labelsFor(s, start).flat();
+          next = (labels.length > 0 ? Math.max(...labels) : start - 1) + 1;
+          return start;
+        });
+      }
+
+      function effectiveStartFor(id) {
+        const index = state.sections.findIndex((s) => s.id === id);
+        return index < 0 ? 1 : effectiveStarts()[index];
+      }
+
+      function allLabels(s, start) {
+        return labelsFor(s, start).flat();
+      }
+
+      function rangeLabel(s, start) {
+        const labels = allLabels(s, start);
+        if (labels.length === 0) return '';
+        const first = labels[0];
+        const last = labels[labels.length - 1];
+        return first === last ? String(first) : first + '–' + last;
+      }
+
+      // ---------- faceplate ----------
+      function numRow(labels) {
+        return (
+          '<div class="numrow">' +
+          labels.map((n) => '<span class="num">' + n + '</span>').join('') +
+          '</div>'
+        );
+      }
+
+      function portRow(s, rowIndex, grid) {
+        const cage = s.kind !== 'rj45';
+        const kindClass = s.kind === 'sfp+' ? 'sfpp' : s.kind;
+        return (
+          '<div class="row">' +
+          grid[rowIndex]
+            .map(
+              (label) =>
+                '<button type="button" class="port kind-' +
+                kindClass +
+                '" aria-label="' +
+                s.kind.toUpperCase() +
+                ' port ' +
+                label +
+                ' (' +
+                s.speed +
+                ')">' +
+                '<span class="led"></span><span class="jack"></span>' +
+                (cage ? '<span class="latch"></span>' : '') +
+                '</button>',
+            )
+            .join('') +
+          '</div>'
+        );
+      }
+
+      function sectionHTML(s, start) {
+        const grid = labelsFor(s, start);
+        let inner = '';
+        for (let r = 0; r < s.rows; r += 2) {
+          inner += numRow(grid[r]);
+          inner += portRow(s, r, grid);
+          if (r + 1 < s.rows) {
+            inner += portRow(s, r + 1, grid);
+            inner += numRow(grid[r + 1]);
+          }
+        }
+        const classes = ['section'];
+        if (state.variant === 'C' && state.selectedId === s.id) classes.push('selected');
+        return '<div class="' + classes.join(' ') + '" data-id="' + s.id + '">' + inner + '</div>';
+      }
+
+      function insertHTML(afterId) {
+        return (
+          '<button type="button" class="insert" data-act="insert" data-after="' +
+          afterId +
+          '" title="Add section here">+</button>'
+        );
+      }
+
+      function sameGapGroup(a, b) {
+        if (state.gapRule === 'off') return false;
+        if (a.kind !== b.kind) return false;
+        if (state.gapRule === 'kind-speed' && a.speed !== b.speed) return false;
+        return true;
+      }
+
+      function renderFaceplate() {
+        const starts = effectiveStarts();
+        const parts = [];
+        state.sections.forEach((s, index) => {
+          if (index > 0) {
+            const tight = sameGapGroup(state.sections[index - 1], s);
+            parts.push(
+              '<span class="sec-gap" style="width:' + (tight ? state.tightGap : 16) + 'px"></span>',
+            );
+          }
+          parts.push(sectionHTML(s, starts[index]));
+          if (state.variant === 'C') parts.push(insertHTML(s.id));
+        });
+        if (state.variant === 'C' && state.sections.length === 0) {
+          parts.push('<button type="button" class="insert" data-act="insert" data-after="">+</button>');
+        }
+        portfield.innerHTML = parts.join('');
+      }
+
+      // ---------- inspector: shared bits ----------
+      function options(pairs, current) {
+        return pairs
+          .map(
+            ([value, label]) =>
+              '<option value="' +
+              value +
+              '"' +
+              (value === current ? ' selected' : '') +
+              '>' +
+              label +
+              '</option>',
+          )
+          .join('');
+      }
+
+      function fieldHTML(id, field, label, control) {
+        const min = field === 'start' ? '0' : '1';
+        return (
+          '<label class="field"><span>' +
+          label +
+          '</span>' +
+          control.replace(
+            '<INPUT>',
+            '<input data-id="' +
+              id +
+              '" data-field="' +
+              field +
+              '" type="number" min="' +
+              min +
+              '" step="1" value="' +
+              currentSection(id)[field] +
+              '" />',
+          ) +
+          '</label>'
+        );
+      }
+
+      function fieldSelect(id, field, label, pairs) {
+        const value = currentSection(id)[field];
+        return (
+          '<label class="field"><span>' +
+          label +
+          '</span><select data-id="' +
+          id +
+          '" data-field="' +
+          field +
+          '">' +
+          options(pairs, value) +
+          '</select></label>'
+        );
+      }
+
+      function currentSection(id) {
+        return state.sections.find((s) => s.id === id);
+      }
+
+      function startNumberHTML(s, start) {
+        return (
+          '<input data-id="' +
+          s.id +
+          '" data-field="start" type="number" min="0" step="1" value="' +
+          start +
+          '"' +
+          (s.startMode === 'custom' ? '' : ' disabled') +
+          ' />'
+        );
+      }
+
+      function sectionFieldsHTML(s, layout) {
+        const kindSelect = fieldSelect(s.id, 'kind', 'Port kind', KINDS);
+        const speedSelect = fieldSelect(s.id, 'speed', 'Speed', SPEEDS.map((v) => [v, v]));
+        const numberingSelect = fieldSelect(s.id, 'numbering', 'Numbering', NUMBERINGS);
+        const rowsInput = fieldHTML(s.id, 'rows', 'Rows', '<INPUT>');
+        const colsInput = fieldHTML(s.id, 'cols', 'Columns', '<INPUT>');
+        const startModeSelect = fieldSelect(s.id, 'startMode', 'Start at', START_MODES);
+        const startInput =
+          '<label class="field"><span>Start number</span>' +
+          startNumberHTML(s, effectiveStartFor(s.id)) +
+          '</label>';
+        if (layout === 'table') {
+          return (
+            kindSelect +
+            speedSelect +
+            rowsInput +
+            colsInput +
+            numberingSelect +
+            startModeSelect +
+            startInput
+          );
+        }
+        return '<div class="card-grid">' +
+          kindSelect +
+          speedSelect +
+          rowsInput +
+          colsInput +
+          '<div style="grid-column: span 2">' + numberingSelect + '</div>' +
+          '<div style="grid-column: span 2">' + startModeSelect + '</div>' +
+          '<div style="grid-column: span 2">' + startInput + '</div>' +
+          '</div>';
+      }
+
+      function gapHintText() {
+        if (state.gapRule === 'off') return 'All section gaps are 16px.';
+        const rule = state.gapRule === 'kind-speed' ? 'same kind and speed' : 'same kind';
+        return (
+          'Sections with the ' +
+          rule +
+          ' sit ' +
+          state.tightGap +
+          'px apart; different ones get 16px. Adjust in the prototype bar.'
+        );
+      }
+
+      function identHTML() {
+        return (
+          '<div class="ident">' +
+          '<label class="field"><span>Name</span><input value="Unifi Pro Max 48" /></label>' +
+          '<label class="field"><span>Model</span><input value="USW-Pro-Max-48-PoE" /></label>' +
+          '</div>' +
+          '<p class="hint">Sections render left → right and centre vertically. ' +
+          gapHintText() +
+          '</p>'
+        );
+      }
+
+      // ---------- variant A ----------
+      function cardsHTML() {
+        const starts = effectiveStarts();
+        const cards = state.sections
+          .map(
+            (s, index) =>
+              '<div class="sec-card" data-id="' +
+              s.id +
+              '">' +
+              '<div class="card-head"><span>Section ' +
+              (index + 1) +
+              '</span><span class="range" data-range-for="' +
+              s.id +
+              '">' +
+              rangeLabel(s, starts[index]) +
+              '</span></div>' +
+              sectionFieldsHTML(s, 'card') +
+              '<div class="card-actions">' +
+              '<button class="mini-btn" type="button" data-act="move-left" data-id="' +
+              s.id +
+              '" title="Move left">◀</button>' +
+              '<button class="mini-btn" type="button" data-act="move-right" data-id="' +
+              s.id +
+              '" title="Move right">▶</button>' +
+              '<button class="mini-btn" type="button" data-act="remove" data-id="' +
+              s.id +
+              '" title="Remove section">✕</button>' +
+              '</div></div>',
+          )
+          .join('');
+        return (
+          '<div class="cards">' +
+          cards +
+          '<button class="add-card" type="button" data-act="add">+ Add section</button>' +
+          '</div>'
+        );
+      }
+
+      function variantA() {
+        return (
+          identHTML() +
+          '<div class="section-title"><span>Sections</span><span class="hint">left → right</span></div>' +
+          cardsHTML()
+        );
+      }
+
+      // ---------- variant B ----------
+      function variantB() {
+        const starts = effectiveStarts();
+        const rows = state.sections
+          .map(
+            (s, index) =>
+              '<tr data-id="' +
+              s.id +
+              '">' +
+              '<td><span class="seed"><span class="grip">⣿</span>' +
+              (index + 1) +
+              '</span></td>' +
+              '<td>' +
+              '<select data-id="' +
+              s.id +
+              '" data-field="kind">' +
+              options(KINDS, s.kind) +
+              '</select></td>' +
+              '<td>' +
+              '<select data-id="' +
+              s.id +
+              '" data-field="speed">' +
+              options(SPEEDS.map((v) => [v, v]), s.speed) +
+              '</select></td>' +
+              '<td><input type="number" min="1" step="1" style="width:44px" data-id="' +
+              s.id +
+              '" data-field="rows" value="' +
+              s.rows +
+              '" /></td>' +
+              '<td><input type="number" min="1" step="1" style="width:44px" data-id="' +
+              s.id +
+              '" data-field="cols" value="' +
+              s.cols +
+              '" /></td>' +
+              '<td>' +
+              '<select data-id="' +
+              s.id +
+              '" data-field="numbering">' +
+              options(NUMBERINGS, s.numbering) +
+              '</select></td>' +
+              '<td><select data-id="' +
+              s.id +
+              '" data-field="startMode">' +
+              options(START_MODES, s.startMode) +
+              '</select>' +
+              '<div style="margin-top:3px">' +
+              startNumberHTML(s, starts[index]) +
+              '</div></td>' +
+              '<td style="white-space:nowrap">' +
+              '<button class="mini-btn" type="button" data-act="move-left" data-id="' +
+              s.id +
+              '" title="Move left">◀</button> ' +
+              '<button class="mini-btn" type="button" data-act="move-right" data-id="' +
+              s.id +
+              '" title="Move right">▶</button> ' +
+              '<button class="mini-btn" type="button" data-act="remove" data-id="' +
+              s.id +
+              '" title="Remove">✕</button>' +
+              '</td></tr>',
+          )
+          .join('');
+        const ports = state.sections.reduce((n, s) => n + s.rows * s.cols, 0);
+        const portRows = state.sections.reduce((n, s) => n + s.rows, 0);
+        const columns = state.sections.reduce((n, s) => n + s.cols, 0);
+        return (
+          identHTML() +
+          '<div class="section-title"><span>Sections</span><span class="hint">one row each</span></div>' +
+          '<table class="sec-table"><thead><tr>' +
+          '<th>#</th><th>Kind</th><th>Speed</th><th>Rows</th><th>Cols</th><th>Numbering</th><th>Start</th><th></th>' +
+          '</tr></thead><tbody>' +
+          rows +
+          '</tbody></table>' +
+          '<button class="btn add-row" type="button" data-act="add">+ Add section</button>' +
+          '<div class="totals"><span>' +
+          ports +
+          ' ports</span><span>' +
+          portRows +
+          ' rows</span><span>' +
+          columns +
+          ' columns</span></div>'
+        );
+      }
+
+      // ---------- variant C ----------
+      function variantC() {
+        const starts = effectiveStarts();
+        const chips = state.sections
+          .map(
+            (s, index) =>
+              '<button class="chip' +
+              (state.selectedId === s.id ? ' current' : '') +
+              '" type="button" data-act="select" data-id="' +
+              s.id +
+              '">' +
+              (index + 1) +
+              ' · ' +
+              s.kind.toUpperCase() +
+              ' ' +
+              s.speed +
+              ' <span style="opacity:.6">' +
+              rangeLabel(s, starts[index]) +
+              '</span></button>',
+          )
+          .join('');
+        const s = currentSection(state.selectedId);
+        const sIndex = s ? state.sections.indexOf(s) : -1;
+        const editor = s
+          ? '<div class="selected-card">' +
+            '<div class="section-title"><span>Section ' +
+            (sIndex + 1) +
+            ' · ' +
+            rangeLabel(s, starts[sIndex]) +
+            '</span>' +
+            '<span><button class="mini-btn" type="button" data-act="move-left" data-id="' +
+            s.id +
+            '">◀</button> <button class="mini-btn" type="button" data-act="move-right" data-id="' +
+            s.id +
+            '">▶</button> <button class="mini-btn" type="button" data-act="remove" data-id="' +
+            s.id +
+            '">✕</button></span></div>' +
+            sectionFieldsHTML(s, 'card') +
+            '</div>'
+          : '<div class="selected-card empty">Click a section on the faceplate to edit it.</div>';
+        return (
+          identHTML() +
+          '<p class="hint">Click a section on the faceplate (dashed outline) to edit it; the + between sections inserts a new one after that section.</p>' +
+          editor +
+          '<div class="section-title"><span>Sections</span><span class="hint">left → right</span></div>' +
+          '<div class="chips">' +
+          chips +
+          '<button class="chip" type="button" data-act="add">+ Add section</button>' +
+          '</div>'
+        );
+      }
+
+      // ---------- render ----------
+      function currentVariant() {
+        return VARIANTS.find((v) => v.key === state.variant) || VARIANTS[0];
+      }
+
+      function renderInspector() {
+        const v = currentVariant();
+        if (v.layout === 'bottom') {
+          inspBody.innerHTML =
+            '<div class="d-side">' +
+            identHTML() +
+            '</div>' +
+            '<div class="d-cards">' +
+            cardsHTML() +
+            '</div>';
+          return;
+        }
+        inspBody.innerHTML =
+          v.editor === 'cards' ? variantA() : v.editor === 'table' ? variantB() : variantC();
+      }
+
+      function renderSwitcher() {
+        const v = VARIANTS.find((v) => v.key === state.variant);
+        protoLabel.textContent = v.key + ' · ' + v.name;
+      }
+
+      function renderStatePanel() {
+        statePanel.hidden = !state.showState;
+        if (state.showState) statePanel.textContent = JSON.stringify(state.sections, null, 2);
+      }
+
+      function updateRanges() {
+        const starts = effectiveStarts();
+        state.sections.forEach((s, index) => {
+          document.querySelectorAll('[data-range-for="' + s.id + '"]').forEach((el) => {
+            el.textContent = rangeLabel(s, starts[index]);
+          });
+          inspBody
+            .querySelectorAll('input[data-id="' + s.id + '"][data-field="start"]')
+            .forEach((el) => {
+              el.value = starts[index];
+              el.disabled = s.startMode !== 'custom';
+            });
+        });
+      }
+
+      function render() {
+        const v = currentVariant();
+        document.documentElement.dataset.variant = state.variant;
+        canvasRoot.dataset.theme = state.theme;
+        inspector.className = 'inspector' + (v.layout === 'bottom' ? ' bottom' : '');
+        inspector.style.width = v.layout === 'side' ? state.sideWidth + 'px' : 'auto';
+        inspector.style.height = v.layout === 'bottom' ? state.bottomHeight + 'px' : '';
+        resizeHandle.className = 'resize-handle ' + (v.layout === 'bottom' ? 'bottom' : 'side');
+        renderFaceplate();
+        renderInspector();
+        renderSwitcher();
+        renderStatePanel();
+        // Until the user drags the bottom edge, fit the panel to its content.
+        if (v.layout === 'bottom' && !state.bottomHeightTouched) {
+          inspector.style.height = 'auto';
+          const measured = inspector.scrollHeight;
+          state.bottomHeight = Math.min(Math.max(240, measured || 320), window.innerHeight * 0.7);
+          inspector.style.height = state.bottomHeight + 'px';
+        }
+      }
+
+      // ---------- actions ----------
+      function addSection(afterId) {
+        const section = {
+          id: 's' + nextId++,
+          kind: 'rj45',
+          speed: '1G',
+          rows: 2,
+          cols: 8,
+          numbering: 'interleaved',
+          startMode: 'auto',
+          start: 1,
+        };
+        if (afterId) {
+          const index = state.sections.findIndex((s) => s.id === afterId);
+          state.sections.splice(index + 1, 0, section);
+        } else {
+          state.sections.push(section);
+        }
+        state.selectedId = section.id;
+        render();
+      }
+
+      function moveSection(id, direction) {
+        const index = state.sections.findIndex((s) => s.id === id);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= state.sections.length) return;
+        const [section] = state.sections.splice(index, 1);
+        state.sections.splice(target, 0, section);
+        render();
+      }
+
+      function removeSection(id) {
+        state.sections = state.sections.filter((s) => s.id !== id);
+        if (state.selectedId === id) state.selectedId = state.sections[0]?.id ?? null;
+        render();
+      }
+
+      function updateField(id, field, rawValue) {
+        const section = currentSection(id);
+        if (!section) return;
+        let value = rawValue;
+        if (field === 'rows') value = Math.max(1, Math.min(6, parseInt(rawValue, 10) || 1));
+        if (field === 'cols') value = Math.max(1, Math.min(24, parseInt(rawValue, 10) || 1));
+        if (field === 'start') value = Math.max(0, parseInt(rawValue, 10) || 0);
+        if (field === 'startMode') {
+          value = rawValue === 'custom' ? 'custom' : 'auto';
+          // Seed custom mode with the number the auto chain currently produces.
+          if (value === 'custom' && section.startMode === 'auto') {
+            section.start = effectiveStartFor(section.id);
+          }
+        }
+        section[field] = value;
+        renderFaceplate();
+        updateRanges();
+        renderStatePanel();
+      }
+
+      inspBody.addEventListener('input', (event) => {
+        const el = event.target;
+        if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement)) return;
+        if (!el.dataset.id || !el.dataset.field) return;
+        updateField(el.dataset.id, el.dataset.field, el.value);
+      });
+
+      inspBody.addEventListener('change', (event) => {
+        const el = event.target;
+        if (!(el instanceof HTMLSelectElement)) return;
+        if (!el.dataset.id || !el.dataset.field) return;
+        updateField(el.dataset.id, el.dataset.field, el.value);
+      });
+
+      inspBody.addEventListener('click', (event) => {
+        const el = event.target.closest('[data-act]');
+        if (!el) return;
+        const act = el.dataset.act;
+        if (act === 'add') addSection(null);
+        if (act === 'remove') removeSection(el.dataset.id);
+        if (act === 'move-left') moveSection(el.dataset.id, -1);
+        if (act === 'move-right') moveSection(el.dataset.id, 1);
+      });
+
+      portfield.addEventListener('click', (event) => {
+        const insert = event.target.closest('[data-act="insert"]');
+        if (insert) {
+          addSection(insert.dataset.after || null);
+          return;
+        }
+        if (state.variant !== 'C') return;
+        const sectionEl = event.target.closest('.section');
+        if (!sectionEl) return;
+        state.selectedId = sectionEl.dataset.id;
+        renderInspector();
+        renderFaceplate();
+      });
+
+      // editor hover highlights the matching faceplate section
+      function bindHighlight(root) {
+        root.addEventListener('mouseover', (event) => {
+          const el = event.target.closest('[data-id]');
+          if (!el) return;
+          const sectionEl = portfield.querySelector('.section[data-id="' + el.dataset.id + '"]');
+          if (sectionEl) sectionEl.classList.add('hl');
+        });
+        root.addEventListener('mouseout', (event) => {
+          const el = event.target.closest('[data-id]');
+          if (!el) return;
+          const sectionEl = portfield.querySelector('.section[data-id="' + el.dataset.id + '"]');
+          if (sectionEl) sectionEl.classList.remove('hl');
+        });
+      }
+      bindHighlight(inspBody);
+      bindHighlight(portfield);
+
+      document.getElementById('theme-select').addEventListener('change', (event) => {
+        state.theme = event.target.value;
+        canvasRoot.dataset.theme = state.theme;
+      });
+
+      // Drag the inspector's edge: left edge in side layouts, top edge in the bottom layout.
+      let resizeMode = null;
+      resizeHandle.addEventListener('mousedown', (event) => {
+        resizeMode = currentVariant().layout;
+        event.preventDefault();
+      });
+      window.addEventListener('mousemove', (event) => {
+        if (!resizeMode) return;
+        if (resizeMode === 'side') {
+          state.sideWidth = Math.max(
+            320,
+            Math.min(window.innerWidth - 260, window.innerWidth - event.clientX),
+          );
+          inspector.style.width = state.sideWidth + 'px';
+        } else {
+          state.bottomHeightTouched = true;
+          state.bottomHeight = Math.max(
+            170,
+            Math.min(window.innerHeight - 220, window.innerHeight - event.clientY - 48),
+          );
+          inspector.style.height = state.bottomHeight + 'px';
+        }
+      });
+      window.addEventListener('mouseup', () => {
+        resizeMode = null;
+      });
+
+      document.getElementById('gap-rule').addEventListener('change', (event) => {
+        state.gapRule = event.target.value;
+        renderFaceplate();
+        renderInspector();
+      });
+      document.getElementById('tight-gap').addEventListener('change', (event) => {
+        state.tightGap = parseInt(event.target.value, 10);
+        renderFaceplate();
+        renderInspector();
+      });
+
+      document.querySelector('.proto-bar').addEventListener('click', (event) => {
+        const el = event.target.closest('[data-act]');
+        if (!el) return;
+        const act = el.dataset.act;
+        if (act === 'prev' || act === 'next') {
+          const index = VARIANTS.findIndex((v) => v.key === state.variant);
+          const delta = act === 'next' ? 1 : -1;
+          state.variant = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length].key;
+          try {
+            const url = new URL(location.href);
+            url.searchParams.set('variant', state.variant);
+            history.replaceState(null, '', url);
+          } catch (error) {
+            /* file:// history may be restricted; the in-page switch still works */
+          }
+          render();
+        }
+        if (act === 'toggle-state') {
+          state.showState = !state.showState;
+          renderStatePanel();
+        }
+        if (act === 'reset') {
+          state.sections = DEFAULT_SECTIONS.map((s) => ({ ...s }));
+          state.selectedId = 's3';
+          render();
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        const target = event.target;
+        if (
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable
+        ) {
+          return;
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          const index = VARIANTS.findIndex((v) => v.key === state.variant);
+          const delta = event.key === 'ArrowRight' ? 1 : -1;
+          state.variant = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length].key;
+          render();
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>
