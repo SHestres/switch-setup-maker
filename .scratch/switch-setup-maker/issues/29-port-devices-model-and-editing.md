@@ -23,7 +23,7 @@ Deliverable: the decision recorded as an `## Answer` when resolved, plus any bui
 
 ## Answer
 
-Resolved 2026-10-01. A Device is the far end of a Connection — not a property of the Port and not a separate entity list.
+Resolved 2026-10-01; rendering amended 2026-10-02 by [33](33-speed-and-poe-highlighting.md) (see Rendering). A Device is the far end of a Connection — not a property of the Port and not a separate entity list.
 
 ### Model
 
@@ -42,7 +42,8 @@ Resolved 2026-10-01. A Device is the far end of a Connection — not a property 
 
 ### Rendering
 
-- Jack language only: a device-attached Port reads through the jack itself — a distinct fill plus a small plug motif — with no lead, no name chip and no wire geometry. The name appears on hover (ticket 30) and in the popover while editing. Wired Ports keep the existing connected treatment; the three themes tokenise the Device treatment like the others.
+- A device-attached Port reads exactly like a wired connected Port: the same connected gray shift from the jack. No lead, no name chip, no plug motif and no wire geometry. A wired Port carries its cable in `WireLayer`; a device-attached Port's attachment shows through hover (ticket 30) and the popover while editing. Speed tints (ticket 33) layer over device-attached jacks exactly as over wired connected ones.
+  - *Revised 2026-10-02 by [33](33-speed-and-poe-highlighting.md): the original "distinct fill plus plug motif" was dropped — device-attached jacks use the standard connected treatment.*
 - `WireLayer` draws nothing for Device Connections (no second anchor).
 
 ### Serialisation

@@ -1,7 +1,7 @@
 # 34: Device connections — model, rules & serialisation
 
 Type: task
-Status: ready-for-agent
+Status: superseded
 Blocked by: 26
 
 ## What to build
@@ -19,3 +19,7 @@ The model half of [29](29-port-devices-model-and-editing.md)'s answer — Device
 - [ ] Union-aware helpers cover occupancy, pair identity, cascades and confirm counts.
 - [ ] Version bumped; old files load unchanged; import normalises/rejects as decided in [29](29-port-devices-model-and-editing.md); export writes the normal form.
 - [ ] Unit tests for all of the above; `npm test` is green.
+
+## Comments
+
+- 2026-10-02 — Superseded by the post-MVP spec cut: [spec.md](../spec.md) absorbs this work (Device union, helpers, serialization v3).

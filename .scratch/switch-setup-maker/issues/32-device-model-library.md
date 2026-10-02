@@ -1,7 +1,7 @@
 # 32: Device-model library — real hardware presets
 
 Type: grilling
-Status: ready-for-agent
+Status: resolved
 Blocked by: None
 
 ## Question
@@ -15,3 +15,15 @@ Decide how real hardware models become pickable presets with baked layouts.
 - **Maintenance**: adding models as data-only changes; no pricing or connectivity data.
 
 Deliverable: the decision recorded as an `## Answer` when resolved, plus any build tickets it surfaces.
+
+## Answer
+
+Locked via grilling:
+
+- **Data**: a curated static, in-repo seed of real UniFi switches (representative ~6–10 models across 8/16/24/48-port, PoE and non-PoE), sourced from a dedicated research pass — ticket [37](37-unifi-front-panel-research.md) (UniFi only; the Cisco/Aruba/MikroTik/Juniper reading stays for a later effort).
+- **Model**: `LayoutPreset` gains a `vendor` field; hardware models are the presets with `vendor` set. `model` prefills the Switch's model; labels read `<vendor> <model>`. Generic presets carry no `vendor`. The hand-authored `unifi-48-port` stand-in is replaced.
+- **UX**: the bottom panel's preset gallery becomes a searchable list — substring filter over label/vendor/model, sorted by port count descending, generics and hardware in one list; one-click create-and-select and the hover/focus details line are preserved.
+- **Terminology**: no new canonical term — `Layout preset` in GLOSSARY.md now covers both generic and vendor-backed (hardware) entries.
+- **Maintenance**: data-only additions to `src/model/presets.ts`.
+
+Build work: [38](38-device-model-library.md), blocked by [37](37-unifi-front-panel-research.md).

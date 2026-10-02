@@ -28,6 +28,10 @@ _Avoid_: Type
 The rated speed of a port: 100M, 1G, 2.5G, 5G or 10G in this effort.
 _Avoid_: Rate, bandwidth
 
+**PoE**:
+Whether a section's ports can supply power over Ethernet. A capability of the section in this effort, not a per-port flag; no wattage classes and no switch-level budget.
+_Avoid_: PoE+, PoE++, power budget
+
 **Port layout**:
 A switch's arrangement of ports into sections, each a grid of rows and columns.
 _Avoid_: Port map, configuration
@@ -37,7 +41,7 @@ A horizontal group of ports as laid out on a faceplate.
 _Avoid_: Line, bank
 
 **Section**:
-A vertically-centred bank of ports on a faceplate: a grid of rows and columns sharing a port kind, speed, numbering convention and starting number. Sections line up left to right; same-kind neighbours sit closer together than different kinds.
+A vertically-centred bank of ports on a faceplate: a grid of rows and columns sharing a port kind, speed, PoE capability, numbering convention and starting number. Sections line up left to right; same-kind neighbours sit closer together than different kinds.
 _Avoid_: Bank, group
 
 **Port numbering preset**:
@@ -45,7 +49,7 @@ The convention that generates printed port labels, set per section: alternating 
 _Avoid_: Scheme, mode
 
 **Layout preset**:
-A named, pre-built port layout offered as a starting point when adding a Switch (e.g. 24×1G + 2×SFP); a switch may carry a model name this way. Distinct from the port numbering preset.
+A named, pre-built port layout offered as a starting point when adding a Switch (e.g. 24×1G + 2×SFP); a switch may carry a model name this way. Generic presets carry no vendor; hardware presets are vendor-backed entries (e.g. UniFi USW-Pro-48-PoE) seeding the switch's model and its real port layout. Distinct from the port numbering preset.
 _Avoid_: Template, model preset, switch type
 
 **Connection**:
